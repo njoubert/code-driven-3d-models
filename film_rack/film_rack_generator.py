@@ -68,8 +68,7 @@ import sys
 #
 
 SECTIONS = [
-    {"type": "120-5pack", "rows": 2, "cols": 1},   # bottom
-    {"type": "120",       "rows": 2, "cols": 4},   # top
+    {"type": "35mm", "rows": 5, "cols": 2},
 ]
 
 # ============================================================
@@ -100,8 +99,8 @@ FILM_PROFILES = {
     "120-5pack": {
         "RACK_DEPTH":      50.0,
         "LIP_HEIGHT":      3.5,
-        "OVERHANG":        32.6,
-        "SLOT_WIDTH":      138.0,
+        "OVERHANG":        24.6,   # 8mm shorter than 120 single (was 32.6)
+        "SLOT_WIDTH":      139.0,  # 1mm wider inner width (was 138.0)
         "SLOT_HEIGHT":     33.0,
         "SCOOP_RATIO":     0.80,
         "TRAP_BASE_WIDTH": 31.0,
