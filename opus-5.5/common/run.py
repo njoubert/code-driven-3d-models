@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import json
 import sys
 import time
 from pathlib import Path
@@ -49,6 +50,18 @@ def main():
         sheet = out / "render_sheet.png"
         render_sheet(model, sheet)
         written += [sheet] + draw_sheets(model, out)
+
+    from .bambu import slice_project
+    sliced = slice_project(out / f"{model.name}_plate.3mf")
+    if sliced is None:
+        print("[slice]   skipped (Bambu Studio not installed)")
+    elif "error" in sliced:
+        print(f"[slice]   FAILED: {sliced['error']}")
+    else:
+        print(f"[slice]   Bambu Studio estimate: {sliced['minutes']} min, {sliced['grams']} g "
+              f"({sliced['layer_height']} mm layers)")
+        (out / "slice_estimate.json").write_text(json.dumps(sliced, indent=2) + "\n")
+        written.append(out / "slice_estimate.json")
 
     if args.show:
         from .show import show_model

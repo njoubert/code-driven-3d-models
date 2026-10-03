@@ -24,6 +24,7 @@ models/<name>/
   model.py         build(variant) -> Model; model-specific checks
   notes.md         print log: what was printed, what fit, what changed
   out/<variant>/   generated, but committed: rerun before committing so it matches the code
+  prints/          Bambu Studio projects as actually printed (YYYY-MM-DD_<variant>_vN.3mf); never regenerated
 ```
 
 ## The loop: do this after every geometry change
@@ -52,10 +53,18 @@ have a `coupon` variant: a small, fast print that tests just the fit.
   viewer must be open: command palette → "OCP CAD Viewer: Open viewer").
 - `out/<variant>/viewer.html`: interactive 3D in a browser (open with `open`).
 - `out/<variant>/drawing_<part>.pdf`: technical drawing sheet (opens in VS Code).
-- `out/<variant>/<name>_plate.3mf`: opens in Bambu Studio, ready to slice.
+- `out/<variant>/<name>_plate.3mf`: a Bambu Studio project with our P2S
+  settings (`common/bambu/*.config`), so it opens ready to slice and send.
+  Each run also slices it headlessly with Bambu Studio's CLI and writes the
+  print time and filament to `out/<variant>/slice_estimate.json`.
+  Bambu Studio may save its sliced project over this file; the next run
+  overwrites it, so copy it into `prints/` first and log it in `notes.md`.
 
 ## Printer
 Bambu Lab P2S, 256 × 256 × 256 mm build volume (`BED` in `common/checks.py`).
+Default settings: P2S 0.4 nozzle, Generic PLA, 0.20mm Standard
+(`common/bambu/p2s_pla_0.20_standard.config`, captured from a saved project;
+`python -m common.bambu extract <saved.3mf> <name>` captures new ones).
 
 ## Setup
 ```

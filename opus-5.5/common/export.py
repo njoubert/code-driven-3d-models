@@ -1,24 +1,24 @@
-"""Exports: STEP (use pose, exact geometry), STL (print pose), a 3MF print
-plate with every printed part laid out, and a self-contained viewer.html."""
+"""Exports: STEP (use pose, exact geometry), STL (print pose), a Bambu Studio
+project 3MF with every printed part on the plate and our P2S settings, and a
+self-contained viewer.html."""
 
 from __future__ import annotations
 
 import base64
 import json
-import re
 import struct
-import uuid
-import zipfile
 from pathlib import Path
 
 import numpy as np
-from build123d import Location, Mesher, export_step, export_stl
+from build123d import Location, export_step, export_stl
 
+from . import bambu
+from .checks import BED
 from .geom import TESS_ANGLE, TESS_TOL, mesh_arrays, print_shape
 from .model import Model
 
 PLATE_GAP = 10.0  # mm between parts on the print plate
-# Outputs are committed, so keep them byte-stable: fixed STEP timestamp, name-derived 3MF UUIDs.
+# Outputs are committed, so keep them byte-stable (fixed STEP timestamp; see also bambu.py).
 STEP_TIMESTAMP = "2000-01-01T00:00:00"
 
 
@@ -32,34 +32,15 @@ def export_all(model: Model, out: Path) -> list[Path]:
         written += [step, stl]
 
     plate = out / f"{model.name}_plate.3mf"
-    mesher = Mesher()
-    for part, loc in zip(model.printed, plate_layout(model)):
-        mesher.add_shape(print_shape(part).moved(loc), TESS_TOL, TESS_ANGLE, part_number=part.name)
-    mesher.write(plate)
-    _stable_uuids(plate, model.name)
+    bed_centre = Location((BED[0] / 2, BED[1] / 2, 0))   # slicers put the plate origin at a corner
+    bambu.write_project(plate, [(part.name, print_shape(part).moved(bed_centre * loc))
+                                for part, loc in zip(model.printed, plate_layout(model))], model.name)
     written.append(plate)
 
     viewer = out / "viewer.html"
     viewer.write_text(viewer_html(model), encoding="utf-8")
     written.append(viewer)
     return written
-
-
-def _stable_uuids(path: Path, seed: str):
-    """lib3mf assigns random UUIDs; replace each with one derived from the model name."""
-    with zipfile.ZipFile(path) as z:
-        entries = [(i.filename, z.read(i)) for i in z.infolist()]
-    mapping: dict[str, str] = {}
-
-    def sub(m):
-        new = mapping.setdefault(m.group(1), str(uuid.uuid5(uuid.NAMESPACE_URL, f"{seed}/{len(mapping)}")))
-        return f'UUID="{new}"'
-
-    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
-        for name, data in entries:
-            if name.endswith(".model"):
-                data = re.sub(r'UUID="([0-9a-fA-F-]{36})"', sub, data.decode()).encode()
-            z.writestr(zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0)), data, zipfile.ZIP_DEFLATED)
 
 
 def plate_layout(model: Model) -> list[Location]:
