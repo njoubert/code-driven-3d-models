@@ -1,0 +1,24 @@
+{
+  // Python: use the opus-5.5 venv (build123d, ocp_vscode, ...) so imports resolve
+  // and OCP CAD Viewer runs in the right environment.
+  "python.defaultInterpreterPath": "${workspaceFolder}/opus-5.5/.venv/bin/python",
+  "python.analysis.extraPaths": ["${workspaceFolder}/opus-5.5"],
+  "python.terminal.activateEnvironment": true,
+
+  // OCP CAD Viewer: match the repo's conventions (Z up, mm grid on the bed plane).
+  "OcpCadViewer.view.up": "Z",
+  "OcpCadViewer.view.axes": true,
+  "OcpCadViewer.view.axes0": true,
+  "OcpCadViewer.view.grid_XY": true,
+  "OcpCadViewer.view.black_edges": true,
+  "OcpCadViewer.view.ortho": false,
+  "OcpCadViewer.view.collapse": "leaves",
+  "OcpCadViewer.render.deviation": 0.05,
+  "OcpCadViewer.advanced.autostart": true,
+
+  // Open the drawing PDFs in VS Code's PDF viewer.
+  "workbench.editorAssociations": { "*.pdf": "pdf.preview" },
+
+  "files.exclude": { "**/__pycache__": true },
+  "search.exclude": { "**/.venv": true, "**/out": true }
+}
