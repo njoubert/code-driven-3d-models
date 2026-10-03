@@ -23,7 +23,7 @@ models/<name>/
   design.md        brief: purpose, measurements, named parts, fit, printing
   model.py         build(variant) -> Model; model-specific checks
   notes.md         print log: what was printed, what fit, what changed
-  out/<variant>/   generated, gitignored
+  out/<variant>/   generated, but committed: rerun before committing so it matches the code
 ```
 
 ## The loop: do this after every geometry change

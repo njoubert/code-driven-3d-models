@@ -5,7 +5,10 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import struct
+import uuid
+import zipfile
 from pathlib import Path
 
 import numpy as np
@@ -15,13 +18,15 @@ from .geom import TESS_ANGLE, TESS_TOL, mesh_arrays, print_shape
 from .model import Model
 
 PLATE_GAP = 10.0  # mm between parts on the print plate
+# Outputs are committed, so keep them byte-stable: fixed STEP timestamp, name-derived 3MF UUIDs.
+STEP_TIMESTAMP = "2000-01-01T00:00:00"
 
 
 def export_all(model: Model, out: Path) -> list[Path]:
     written = []
     for part in model.printed:
         step = out / f"{part.name}.step"
-        export_step(part.shape, step)
+        export_step(part.shape, step, timestamp=STEP_TIMESTAMP)
         stl = out / f"{part.name}.stl"
         export_stl(print_shape(part), stl, TESS_TOL, TESS_ANGLE)
         written += [step, stl]
@@ -31,12 +36,30 @@ def export_all(model: Model, out: Path) -> list[Path]:
     for part, loc in zip(model.printed, plate_layout(model)):
         mesher.add_shape(print_shape(part).moved(loc), TESS_TOL, TESS_ANGLE, part_number=part.name)
     mesher.write(plate)
+    _stable_uuids(plate, model.name)
     written.append(plate)
 
     viewer = out / "viewer.html"
     viewer.write_text(viewer_html(model), encoding="utf-8")
     written.append(viewer)
     return written
+
+
+def _stable_uuids(path: Path, seed: str):
+    """lib3mf assigns random UUIDs; replace each with one derived from the model name."""
+    with zipfile.ZipFile(path) as z:
+        entries = [(i.filename, z.read(i)) for i in z.infolist()]
+    mapping: dict[str, str] = {}
+
+    def sub(m):
+        new = mapping.setdefault(m.group(1), str(uuid.uuid5(uuid.NAMESPACE_URL, f"{seed}/{len(mapping)}")))
+        return f'UUID="{new}"'
+
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        for name, data in entries:
+            if name.endswith(".model"):
+                data = re.sub(r'UUID="([0-9a-fA-F-]{36})"', sub, data.decode()).encode()
+            z.writestr(zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0)), data, zipfile.ZIP_DEFLATED)
 
 
 def plate_layout(model: Model) -> list[Location]:

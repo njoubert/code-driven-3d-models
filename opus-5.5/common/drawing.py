@@ -141,7 +141,7 @@ def _draw(model: Model, sheet: Sheet, shape, stem: Path, n: int, total: int):
         _note(ax, placed[note.view], note, sheet)
     _title_block(ax, W, model, sheet, s, paper, n, total)
 
-    fig.savefig(stem.with_suffix(".pdf"))
+    fig.savefig(stem.with_suffix(".pdf"), metadata={"CreationDate": None})  # stable bytes for git
     fig.savefig(stem.with_suffix(".png"), dpi=170, facecolor="white")
     plt.close(fig)
 
