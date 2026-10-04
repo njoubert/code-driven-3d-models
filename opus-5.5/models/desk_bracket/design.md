@@ -12,7 +12,8 @@ easy removal isn't needed).
 |---|---|---|
 | width | 60 mm | published (2.36 in); coupon v1 fit as modelled |
 | height | 122.12 mm | measured (calipers), body without the rubber feet; published 123 |
-| rubber feet | 1.24 mm tall | measured (123.36 with feet); width 8 mm and position **assumed** |
+| rubber feet | 1.24 mm tall, 5.7 mm wide, 2 mm in from each side | measured (123.36 high with feet) |
+| ports | centres 22.7 (power), 38.0 and 54.5 (Thunderbolt) mm up; 19–60 overall | measured from the body's bottom plate (feet side, not counting the feet); their sideways position and the plugs' sizes are from the photo |
 | feet compliance | none | owner: the rubber has no noticeable give, |
 | depth | 117 mm | published (4.60 in); confirmed by coupon v1 (slack measured as modelled) |
 | mass | 0.9 kg | published |
@@ -79,6 +80,23 @@ The desk underside is z = 0; everything hangs below it.
   top (as mounted), plugs 25 / 28 mm long; exhaust slots beside the ports,
   30–81 mm down. The checks keep the plugs and the space behind the exhaust
   clear (`PLUGS`, `EXHAUST`).
+- **sidearm** (owner's variant of the cradle) — the device **right side up**,
+  its rubber feet on the foam strips on the floor strips (the same floor
+  window as the cradle; the feet, 2–7.7 mm in from the sides, are fully over
+  the strips), same depth, so still 3 mm of air above it.
+  Right side up, the ports are low on the back, on its +x half (the exhaust
+  on the -x half). Instead of the tail, a **tab** off the +x side wall's back
+  post, level with the ports (owner: rather than a full-height arm, then a
+  braced wing): a 5 mm plate reaching 45 mm back, just tall enough for the
+  anchors and their ties (13–67 mm above the device's bottom), back corners
+  rounded. Its inner face carries the three anchors (same anchor, turned to
+  hang sideways; grooves along y) at 21, 40 and 59 mm above the device's
+  bottom, spread over the ports (centres 22.7, 38.0, 54.5 mm, measured). Lips
+  reach 6 mm up the body (9.24 mm off the floor, over the feet and foam). Only
+  the flanges touch the desk: 56 cm² vs the cradle's 104; screws three per
+  flange. The tab grows straight up from the post when printed standing on
+  end (no supports for it); 224 min, 91 g. (Tried first: a full-height arm
+  with a flange, 66 cm², 246 min, 106 g; a braced wing, 225 min, 97 g.)
 - **upright** (recommended) — two U-straps screwed to the desk; the device stands in them on
   its rubber feet, as on a desk. Straps are 14 mm wide so their arms sit on the
   solid edge columns rather than the fins. Each strap: a flange each side with one
@@ -152,8 +170,6 @@ back, and can be removed by lifting it less than the space available; front
 and back faces open inside the border; fin coverage reported.
 
 ## Open questions
-- Where the rubber strips are and how wide (assumed 8 mm wide, 10 mm in from
-  each side). Nothing depends on it now that the device hangs free.
 - Drawer: the cage's frames print as free-standing 130 mm posts; watch for
   wobble near the top.
 - Cradle: foam: soft enough to isolate the fans, firm enough that 0.9 kg

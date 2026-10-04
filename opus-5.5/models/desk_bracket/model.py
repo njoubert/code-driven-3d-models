@@ -59,9 +59,9 @@ DESK_T = 18.0
 PETG = "PETG"                  # recommended; the project files load the PLA preset, so switch filament
 
 # ---- inverted: upside down, rubber feet pressed against the desk
-FEET_H, FEET_W = 1.24, 8.0     # rubber strips on the device's bottom: height measured (123.36 with, 122.12
-                               # without); width assumed
-FEET_INSET = 10.0              # strip centre from the side
+FEET_H, FEET_W = 1.24, 5.7     # rubber strips on the device's bottom, measured: 1.24 tall (123.36 with, 122.12
+                               # without), 5.7 wide
+FEET_INSET = 2.0 + FEET_W / 2  # strip centre from the side: measured 2 mm in from the edge
 PRELOAD = 0.5                  # how far the straps press the feet into the desk
 RAMP = 1.5                     # lead-in chamfer on the front strap's floor
 
@@ -87,10 +87,17 @@ BEAM = 12.0                    # floor strips left either side of the floor wind
 
 # ---- cable tail: a plate behind the device, flat against the desk, with zip-tie anchors underneath.
 # The owner loops each cable before tying it, so the anchors needn't be far enough back for a gentle
-# bend: they sit just behind the opening. Ports, as mounted, from the back photo: **assumed, measure**.
-#        name           x      depth below the device's top   plug (w, h)   plug length   cable radius
-PLUGS = (("thunderbolt", -8.5, 38.0, (12.0, 10.0), 28.0, 2.5),     # lower port, with OWC's screw-lock
-         ("power",       -13.0, 20.5, (9.0, 9.0),   25.0, 2.0))
+# bend: they sit just behind the opening.
+# Ports: heights measured (owner) from the body's bottom plate (the feet side, not counting the feet):
+# power centre 22.7, lower Thunderbolt centre 38.0, upper Thunderbolt centre 54.5; 19 to the bottom of
+# the lowest, 60 to the top of the highest. Their x and the plugs' sizes are from the back photo
+# (**assumed**). Given as mounted upside down: x as seen there, "depth" below its top, which is the height
+# above the feet-side plate.
+PORTS_SPAN = (19.0, 60.0)
+PORT_UP = {"power": 22.7, "thunderbolt": 38.0, "thunderbolt 2": 54.5}
+#        name           x      depth (height above the feet-side plate)   plug (w, h)   plug length   cable radius
+PLUGS = (("thunderbolt", -8.5, PORT_UP["thunderbolt"], (12.0, 10.0), 28.0, 2.5),   # lower port, OWC's screw-lock
+         ("power",       -13.0, PORT_UP["power"], (9.0, 9.0), 25.0, 2.0))   # the upper Thunderbolt port is unused
 EXHAUST = ((0.0, 8.0), (30.0, 81.0))   # exhaust slots: x range, depth range below the device's top (assumed)
 TAIL_T = TF                    # plate thickness: flush with the flanges
 TAIL_RIB = 7.0                 # the side walls continue this far below the plate along the tail
@@ -102,6 +109,14 @@ CABLE_D = (4.0, 5.3)           # cable diameters the anchors' cradles take (owne
 SADDLE_R = CABLE_D[1] / 2 + 0.1   # each anchor's underside has a round groove the cable sits in, sized for the
 SADDLE_D = 1.6                 # thickest cable; it's SADDLE_D deep, so its sides come only partway around the
                                # cable (not past its widest point): any cable in the range seats, none snaps in
+
+# ---- sidearm: the cradle with the device right side up and, instead of the tail, a tab off one side
+# wall's back post, level with the ports, carrying the cable anchors: only the flanges touch the desk
+ARM_L = 45.0                   # how far the tab reaches behind the cradle (room behind the plugs for the loops)
+ARM_POST = 14.0                # the anchors are centred this far in from the tab's end
+ARM_ANCHOR_UP = (21.0, 40.0, 59.0)   # anchor heights above the device's bottom: spread over PORTS_SPAN
+TAB_MARGIN = 4.0               # the tab reaches this far above the top anchor's tie and below the bottom one's
+TAB_R = 6.0                    # the tab's back corners are rounded
 
 # ---- coupon: the cradle's base only, to test the fit before the full print
 COUPON_FLOOR = 1.6             # floor kept under the device (the cradle's is T; thickness doesn't affect fit)
@@ -257,39 +272,111 @@ def tail_frame():
     return tie_y, a, y_end, point
 
 
-def cradle_screws():
-    """(x, y) of the cradle's 6 screws, three along each side: the front of the flange, the back corner of
-    the tail (as far apart as they go, against tugs on the cables), and one midway between them, so the
-    plastic between screws spans half as far and isn't left to carry the load on its own. ~1 kg hangs on
-    them; one #6 screw in 11 mm of wood holds well over 100 N."""
+def arm_frame():
+    """The side arm: its end (y_end), the y of its anchors (centred on its end post), and the device's
+    bottom (right side up: on its feet, on the foam), which the port and anchor heights are measured from."""
     iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame()
-    tie_y, a, y_end, point = tail_frame()
+    y_end = y1 + ARM_L
+    return y_end, y_end - ARM_POST / 2, -ih + FOAM_GAP + FEET_H
+
+
+def three_per_side(front, back):
+    """Front, back, and one midway between them: the plastic between screws spans half as far."""
+    return (front, (front + back) / 2, back)
+
+
+def cradle_screws(style="tail"):
+    """(x, y) of the cradle's 6 screws, three along each side. ~1 kg hangs on them; one #6 screw in
+    11 mm of wood holds well over 100 N. "tail": the back pair at the tail's back corners, as far apart
+    as they go, against tugs on the cables. "arm": all on the flanges, front, middle and back."""
+    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame()
     xs = xo + FLANGE / 2 + 1
-    front, back = y0 + 14, y_end - 9
-    return [(sx * xs, y) for sx in (-1, 1) for y in (front, (front + back) / 2, back)]
+    back = tail_frame()[2] - 9 if style == "tail" else y1 - 14
+    return [(sx * xs, y) for sx in (-1, 1) for y in three_per_side(y0 + 14, back)]
 
 
-def make_cradle():
-    """One part: the U-profile runs the full depth with continuous flanges, so both ends and all
-    screw holes are fixed relative to each other. The device sits upside down, rubber feet pressed
-    against the desk, held front and back by low lips. Side and floor windows keep the fins open.
-    Install: drop the device in, then screw the cradle up under the desk.
-    -> (cradle, device)"""
+def cradle_base(lip, beam):
+    """The cradle without its cable management: the full-length U with both flanges, an open frame for
+    each side wall, a floor window leaving a `beam`-wide strip each side, and full-width lips."""
     iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame()
-
-    cradle = strap(iw, ih, y0, y1, screws=False)   # full-length U with both flanges (holes added below)
+    cradle = strap(iw, ih, y0, y1, screws=False)   # holes are added by the caller
     # side walls: one open rectangle each, between the end posts and the thin top/bottom rails.
     # Printed standing on its front end, the back post spans the opening: supports hold it up.
     ya, yb, za, zb = y0 + POST, y1 - POST, -(TF + RAIL), -ih + RAIL
     cradle -= Box(2 * (xo + 1), yb - ya, za - zb, align=(C, MIN, MIN)).moved(Location((0, ya, zb)))
-    # floor window, leaving a strip each side under the device's flat top plate. Its back edge
-    # spans the opening when printed standing up: supports hold it, as for the side openings.
-    wx = iw / 2 - BEAM
+    # floor window. Its back edge spans the opening when printed standing up: supports hold it.
+    wx = iw / 2 - beam
     cradle -= Box(2 * wx, yb - ya, T + 2, align=(C, MIN, MAX)).moved(Location((0, ya, -ih + 1)))
-    # lips front and back, on the floor
-    lip = CRADLE_LIP + FOAM_GAP                    # full width, wall to wall (1 mm into each wall: one solid)
+    # lips front and back, on the floor, full width, wall to wall (1 mm into each wall: one solid)
     cradle += Box(iw + 2, STOP_T, lip, align=(C, MIN, MIN)).moved(Location((0, y0, -ih)))
     cradle += Box(iw + 2, STOP_T, lip, align=(C, MAX, MIN)).moved(Location((0, y1, -ih)))
+    return cradle
+
+
+def anchor():
+    """A zip-tie anchor in its own frame: mounted on a face at z = 0, hanging into -z, centred on x = y = 0.
+    A tunnel along x right against the face takes the tie; a groove along y on its underside seats the
+    cable; its -y face is 45°, so it prints unsupported when y points up. -> (block, cuts)"""
+    a = TUNNEL_W / 2 + 2
+    apex = -ANCHOR_H                               # the groove's deepest point, under the tunnel's floor
+    zt, zb = 1.0, apex - SADDLE_D
+    side = Plane(origin=(-ANCHOR_W / 2, 0, 0), x_dir=(0, 1, 0), z_dir=(1, 0, 0))   # local (u, v) = (y, z)
+    block = Polygon((-a - (zt - zb), zt), (a, zt), (a, zb), (-a, zb), align=None)
+    cuts = (Box(ANCHOR_W + 2, TUNNEL_W, TUNNEL_H, align=(C, C, MAX))
+            + Cylinder(SADDLE_R, 2 * (a + ANCHOR_H + SADDLE_D + 3), rotation=(90, 0, 0)).moved(
+                Location((0, 0, apex - SADDLE_R))))
+    return extrude(side * block, amount=ANCHOR_W, dir=(1, 0, 0)), cuts
+
+
+def anchor_ref(d):
+    """In an anchor's frame: a piece of cable of diameter d in its groove, and a zip tie through the
+    tunnel, down both sides of the anchor and under the cable. -> (cable, tie)"""
+    apex = -ANCHOR_H
+    cable = Cylinder(d / 2, 40, rotation=(90, 0, 0)).moved(Location((0, 0, apex - d / 2)))
+    hw, top, bot = ANCHOR_W / 2 + 0.05, -0.45, apex - d
+    outer = Box(2 * (hw + TIE_T), TIE_W, top - (bot - TIE_T), align=(C, C, MAX)).moved(Location((0, 0, top)))
+    inner = Box(2 * hw, TIE_W + 2, (top - TIE_T) - bot, align=(C, C, MAX)).moved(Location((0, 0, top - TIE_T)))
+    return cable, outer - inner
+
+
+def anchor_places(style):
+    """Where the anchors go: a Location per anchor, taking its frame (face at z = 0, hanging into -z)
+    into place. "tail": under the tail plate. "arm": on the inner face of the arm's end post, so they
+    hang towards the cables (-x), tunnels running up and down."""
+    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame()
+    if style == "tail":
+        tie_y = tail_frame()[0]
+        return [Location((x, tie_y, -TAIL_T)) for x in ANCHOR_X]
+    y_end, tie_y, bottom = arm_frame()
+    return [Location((xi, tie_y, bottom + h), (0, 90, 0)) for h in ARM_ANCHOR_UP]
+
+
+def make_device(right_side_up=False):
+    """The device in the cradle: upside down (feet up, DESK_GAP below the desk), or right side up on its
+    feet, on the foam. Either way the stack is the same height, so the cradle is too."""
+    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame()
+    if right_side_up:
+        bottom = -ih + FOAM_GAP + FEET_H
+        device = device_body(Box(DEV_W, DEV_D, DEV_H, align=(C, C, MIN)).moved(Location((0, 0, bottom))))
+        feet_z, feet_align = bottom, MAX
+    else:
+        device = device_body(Box(DEV_W, DEV_D, DEV_H, align=(C, C, MAX)).moved(Location((0, 0, body_top))))
+        feet_z, feet_align = body_top, MIN
+    for sx in (-1, 1):                             # the rubber strips
+        device += Box(FEET_W, DEV_D - 10, FEET_H, align=(C, C, feet_align)).moved(
+            Location((sx * (DEV_W / 2 - FEET_INSET), 0, feet_z)))
+    return device
+
+
+def make_cradle():
+    """One part: the U-profile runs the full depth with continuous flanges, so both ends and all
+    screw holes are fixed relative to each other. The device sits upside down on a foam pad, hanging
+    free of the desk, held front and back by lips. Side and floor windows keep the fins open. A tail
+    behind it, against the desk, carries the cable anchors.
+    Install: foam, then the device, then screw the cradle up under the desk.
+    -> (cradle, device)"""
+    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame()
+    cradle = cradle_base(CRADLE_LIP + FOAM_GAP, BEAM)
 
     # cable tail: the cradle's own side profile continues back: flanges and plate flush, the same
     # rounded outer edge, and the side walls carry on as short ribs, so the curve from flange to wall
@@ -314,59 +401,85 @@ def make_cradle():
     opening = Polygon((-xi - 2, y1 - 2), (xi + 2, y1 - 2), (0, point), align=None)
     tail -= extrude(Plane.XY.offset(-TAIL_T - 1) * opening, amount=TAIL_T + 2, dir=(0, 0, 1))
     cradle += tail
-    for x in ANCHOR_X:                             # anchors: 45° front face, so they print unsupported
-        side = Plane(origin=(x - ANCHOR_W / 2, 0, 0), x_dir=(0, 1, 0), z_dir=(1, 0, 0))   # local (u, v) = (y, z)
-        apex = -TAIL_T - ANCHOR_H                  # the cradle groove's deepest point, under the tunnel's floor
-        zt, zb = -TAIL_T + 1, apex - SADDLE_D
-        block = Polygon((tie_y - a - (zt - zb), zt), (tie_y + a, zt), (tie_y + a, zb), (tie_y - a, zb), align=None)
-        cradle += extrude(side * block, amount=ANCHOR_W, dir=(1, 0, 0))
-        cradle -= Box(ANCHOR_W + 2, TUNNEL_W, TUNNEL_H, align=(C, C, MAX)).moved(Location((x, tie_y, -TAIL_T)))
-        groove = Cylinder(SADDLE_R, 2 * (a + ANCHOR_H + SADDLE_D + 3), rotation=(90, 0, 0))
-        cradle -= groove.moved(Location((x, tie_y, apex - SADDLE_R)))      # runs along Y: prints as part of each layer
-    for x, y in cradle_screws():                   # after the tail: the back pair go through it
+    block, cuts = anchor()
+    for loc in anchor_places("tail"):
+        cradle += block.moved(loc)
+        cradle -= cuts.moved(loc)
+    for x, y in cradle_screws("tail"):             # after the tail: the back pair go through it
         cradle -= countersunk(x, y, -TF, TF)
-
-    device = device_body(Box(DEV_W, DEV_D, DEV_H, align=(C, C, MAX)).moved(Location((0, 0, body_top))))
-    for sx in (-1, 1):                             # rubber strips, now on top against the desk
-        device += Box(FEET_W, DEV_D - 10, FEET_H, align=(C, C, MIN)).moved(
-            Location((sx * (DEV_W / 2 - FEET_INSET), 0, body_top)))
-    return cradle, device
+    return cradle, make_device()
 
 
-def foam():
-    """Reference foam strips on the floor strips, squeezed to FOAM_GAP."""
+def make_sidearm():
+    """The cradle with the device right side up (feet on the foam) and, instead of the tail, a tab off
+    the +x side wall's back post, level with the ports, reaching ARM_L behind it, its inner face carrying
+    the cable anchors. Only the flanges touch the desk. The ports are on the device's +x half (right side
+    up); its exhaust on the -x half.
+    -> (cradle, device)"""
     iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame()
-    wx = iw / 2 - BEAM
+    y_end, tie_y, bottom = arm_frame()
+    cradle = cradle_base(CRADLE_LIP + FOAM_GAP + FEET_H, BEAM)
+    # the tab: the side wall carried on behind the back post, just over the anchors' height, its back
+    # corners rounded. Standing on its front end to print, it grows straight up from the post: no supports.
+    reach = ANCHOR_W / 2 + TIE_T + TAB_MARGIN
+    zlo, zhi = bottom + min(ARM_ANCHOR_UP) - reach, bottom + max(ARM_ANCHOR_UP) + reach
+    tab = Box(T, y_end - y1 + 1, zhi - zlo, align=(MIN, MIN, MIN)).moved(Location((xi, y1 - 1, zlo)))
+    tab = fillet(tab.edges().filter_by(Axis.X).filter_by(lambda e: e.center().Y > y_end - 0.1), TAB_R)
+    cradle += tab
+    block, cuts = anchor()
+    for loc in anchor_places("arm"):
+        cradle += block.moved(loc)
+        cradle -= cuts.moved(loc)
+    for x, y in cradle_screws("arm"):
+        cradle -= countersunk(x, y, -TF, TF)
+    return cradle, make_device(right_side_up=True)
+
+
+def foam(right_side_up=False):
+    """Reference foam strips on the floor strips (beside the floor window), squeezed to FOAM_GAP, centred
+    under the rubber feet (right side up, the feet stand on them), but kept on the strips."""
+    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame()
+    xc = min(DEV_W / 2 - FEET_INSET, iw / 2 - FOAM_W / 2 - 0.5)
     ya, yb = y0 + STOP_T + 0.5, y1 - STOP_T - 0.5
     return _union([Box(FOAM_W, yb - ya, FOAM_GAP, align=(C, MIN, MIN)).moved(
-        Location((sx * (wx + 0.5 + FOAM_W / 2), ya, -ih))) for sx in (-1, 1)])
+        Location((sx * xc, ya, -ih))) for sx in (-1, 1)])
 
 
-def plugs_and_ties():
-    """Reference plugs (as assumed in PLUGS), and at each anchor a short piece of cable (the thinnest,
-    the thickest and one between) in its groove, with a zip tie through the tunnel around it.
-    -> (plugs, cables, ties)"""
-    body_top = cradle_frame()[1]
-    tie_y, a, y_end, point = tail_frame()
-    plugs = [Box(w, length, h, align=(C, MIN, C)).moved(Location((x, DEV_D / 2, body_top - depth)))
-             for name, x, depth, (w, h), length, r in PLUGS]
-    ties, cables = [], []
-    apex = -TAIL_T - ANCHOR_H
-    for xa, d in zip(ANCHOR_X, (CABLE_D[0], CABLE_D[1], sum(CABLE_D) / 2)):
-        cables.append(Cylinder(d / 2, 40, rotation=(90, 0, 0)).moved(Location((xa, tie_y, apex - d / 2))))
-        # the tie: through the tunnel, down both sides of the anchor, under the cable
-        hw, top, bot = ANCHOR_W / 2 + 0.05, -TAIL_T - 0.45, apex - d
-        outer = Box(2 * (hw + TIE_T), TIE_W, top - (bot - TIE_T), align=(C, C, MAX)).moved(Location((xa, tie_y, top)))
-        inner = Box(2 * hw, TIE_W + 2, (top - TIE_T) - bot, align=(C, C, MAX)).moved(Location((xa, tie_y, top - TIE_T)))
-        ties.append(outer - inner)
-    return _union(plugs), _union(cables), _union(ties)
+def back_face(right_side_up=False):
+    """The device's back, as placed: its plugs (as assumed in PLUGS) and the space behind its exhaust
+    slots (EXHAUST), 60 mm deep. PLUGS and EXHAUST are given upside down (x as mounted, depth below
+    its top); right side up, x flips and depth is height above its bottom. -> (plugs, exhaust space)"""
+    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame()
+    bottom = -ih + FOAM_GAP + FEET_H
+    at = (lambda x, d: (-x, bottom + d)) if right_side_up else (lambda x, d: (x, body_top - d))
+    plugs = []
+    for name, x, depth, (w, h), length, r in PLUGS:
+        px, pz = at(x, depth)
+        plugs.append(Box(w, length, h, align=(C, MIN, C)).moved(Location((px, DEV_D / 2, pz))))
+    (ex0, ex1), (d0, d1) = EXHAUST
+    xa, za = at(ex0, d0)
+    xb, zb = at(ex1, d1)
+    space = Box(abs(xb - xa), 60, abs(zb - za), align=(MIN, MIN, MIN)).moved(
+        Location((min(xa, xb), DEV_D / 2, min(za, zb))))
+    return _union(plugs), space
+
+
+def anchor_refs(style):
+    """A cable (the thinnest, the thickest, one between) and a tie at each anchor. -> (cables, ties)"""
+    cables, ties = [], []
+    for loc, d in zip(anchor_places(style), (CABLE_D[0], CABLE_D[1], sum(CABLE_D) / 2)):
+        cable, tie = anchor_ref(d)
+        cables.append(cable.moved(loc))
+        ties.append(tie.moved(loc))
+    return _union(cables), _union(ties)
 
 
 def cradle_concept():
     iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame()
     tie_y, a, y_end, point = tail_frame()
     cradle, device = make_cradle()
-    plugs, cable_bits, ties = plugs_and_ties()
+    plugs, _ = back_face()
+    cable_bits, ties = anchor_refs("tail")
     stand = Location((0, 0, 0), (90, 0, 0))        # print standing on its front end
     parts = [
         Part("cradle", cradle, color="#e07a3f", print_pose=stand),
@@ -375,7 +488,7 @@ def cradle_concept():
         Part("plugs", plugs, color="#3a6fd8", reference=True),
         Part("cables", cable_bits, color="#26282c", reference=True),
         Part("ties", ties, color="#f2f2ee", reference=True),
-        Part("screws", _union([screw(x, y, -TF) for x, y in cradle_screws()]), color="#b8bcc2", reference=True),
+        Part("screws", _union([screw(x, y, -TF) for x, y in cradle_screws("tail")]), color="#b8bcc2", reference=True),
         Part("desk", desk(2 * xf + 40, 2 * y_end + 20).moved(Location((0, y_end / 2 - DEV_D / 4, 0))),
              color="#c8a978", reference=True, opacity=0.25),
     ]
@@ -392,6 +505,40 @@ def cradle_concept():
                    side="right", along=-20)])]
     detail = ("zip-tie anchors", (ANCHOR_X[2], tie_y, -TAIL_T - 4), 16)
     return parts, sheets, Plane.YZ, "Desk bracket — cradle (one part, upside down, lipped)", detail
+
+
+def sidearm_concept():
+    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame()
+    y_end, tie_y, bottom = arm_frame()
+    cradle, device = make_sidearm()
+    plugs, _ = back_face(right_side_up=True)
+    cable_bits, ties = anchor_refs("arm")
+    lip = CRADLE_LIP + FOAM_GAP + FEET_H
+    stand = Location((0, 0, 0), (90, 0, 0))        # print standing on its front end
+    parts = [
+        Part("cradle", cradle, color="#e07a3f", print_pose=stand),
+        Part("device", device, color="#5b6068", reference=True, explode=(0, 0, -40)),
+        Part("foam", foam(right_side_up=True), color="#e8d44d", reference=True),
+        Part("plugs", plugs, color="#3a6fd8", reference=True),
+        Part("cables", cable_bits, color="#26282c", reference=True),
+        Part("ties", ties, color="#f2f2ee", reference=True),
+        Part("screws", _union([screw(x, y, -TF) for x, y in cradle_screws("arm")]), color="#b8bcc2", reference=True),
+        Part("desk", desk(2 * xf + 40, 2 * y_end + 20).moved(Location((0, y_end / 2 - DEV_D / 4, 0))),
+             color="#c8a978", reference=True, opacity=0.25),
+    ]
+    sheets = [Sheet("cradle", material=PETG, dims=[
+        Dim("front", (-iw / 2, y0, -ih), (iw / 2, y0, -ih), "h", -16),
+        Dim("front", (-xi, y0, -ih), (-xi, y0, 0), "v", -8),
+        Dim("right", (xo, y0, -ih), (xo, y1, -ih), "h", -16),
+        Dim("right", (xo, y1, 0), (xo, y_end, 0), "h", 8),
+    ], notes=[Note("right", (xo, y0 + STOP_T / 2, -ih + lip), f"lip {lip:g} high ({CRADLE_LIP:g} above the device), front and back",
+                   side="above", along=-10),
+              Note("top", (-(xo + FLANGE / 2 + 1), 0, 0),
+                   f"{len(cradle_screws('arm'))}× countersunk for #6 flat-head screws", side="left", along=0),
+              Note("right", (xo, y_end - ARM_POST / 2, bottom + ARM_ANCHOR_UP[1]),
+                   f"{len(ARM_ANCHOR_UP)}× zip-tie anchor on the tab's inside, for 4.8 mm ties", side="right", along=0)])]
+    detail = ("zip-tie anchors", (xi - 4, tie_y, bottom + ARM_ANCHOR_UP[1]), 30)
+    return parts, sheets, Plane.YZ, "Desk bracket — cradle, right side up, cable tab", detail
 
 
 def coupon_concept():
@@ -485,12 +632,13 @@ def drawer_concept():
     return parts, sheets, Plane.XZ.offset(-DETENT_Y), "Desk bracket — drawer (upright cage)"
 
 
-SLICER = {"cradle": {"enable_support": "1"}}   # tree supports under the back posts, in the side openings
+SLICER = {"cradle": {"enable_support": "1"},   # tree supports under the back posts, in the side openings
+          "sidearm": {"enable_support": "1"}}   # the side and floor openings still need them
 
 
 # ---------------------------------------------------------------- model
 
-VARIANTS = ("cradle", "coupon", "upright", "inverted", "flat", "drawer")
+VARIANTS = ("cradle", "sidearm", "coupon", "upright", "inverted", "flat", "drawer")
 
 
 def build(variant: str = "cradle") -> Model:
@@ -499,7 +647,7 @@ def build(variant: str = "cradle") -> Model:
     if variant not in VARIANTS:
         raise ValueError(f"variant must be one of {VARIANTS}")
     concept = {"drawer": drawer_concept, "inverted": inverted_concept, "cradle": cradle_concept,
-               "coupon": coupon_concept}.get(variant, lambda: strap_concept(variant))
+               "coupon": coupon_concept, "sidearm": sidearm_concept}.get(variant, lambda: strap_concept(variant))
     parts, sheets, section, title, *detail = concept()
     return Model(name="desk_bracket", title=title, parts=parts, sheets=sheets, section=section,
                  checks=lambda r, p: checks(r, p, variant), slicer=SLICER.get(variant, {}),
@@ -577,7 +725,7 @@ def checks(report, parts, variant):
 
     report.check("device: no interference", _overlap(brackets, dev) < 1e-4, f"{_overlap(brackets, dev):.4f} mm³")
 
-    if variant in ("cradle", "coupon"):
+    if variant in ("cradle", "sidearm", "coupon"):
         # a device with sharp edges (0.2 mm), on the floor without foam, pushed against either wall
         iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame()
         sharp = device_body(Box(DEV_W, DEV_D, 10, align=(C, C, MIN)).moved(Location((0, 0, -ih))))
@@ -616,10 +764,11 @@ def checks(report, parts, variant):
         report.check("device lifts out of the tray", _overlap(tray, mv(dev, z=db.size.Z + 5)) < 1e-4)
         report.check("device held in the tray", _overlap(tray, mv(dev, y=-1.5)) > 0.01 and _overlap(tray, mv(dev, x=1.5)) > 0.01,
                      "sliding it 1.5 mm forward or sideways collides")
-    elif variant == "cradle":
+    elif variant in ("cradle", "sidearm"):
+        arm = variant == "sidearm"
         desk_ = parts["desk"].shape
         up, clear = _play(desk_, dev, 2, 1, hi=10), _lift_to_clear(brackets, dev)
-        report.dim("air between the feet and the desk (measured)", up, DESK_GAP, tol=0.03)
+        report.dim("air between the device and the desk (measured)", up, DESK_GAP, tol=0.03)
         report.check("device can't jump the lips", clear > up + 1,
                      f"it must lift {clear:.1f} mm to clear a lip; the desk stops it at {up:.1f} mm")
         report.dim("space under the device for foam (measured)", _play(brackets, dev, 2, -1, hi=5), FOAM_GAP, tol=0.03)
@@ -630,7 +779,7 @@ def checks(report, parts, variant):
         report.check("device: held sideways", _overlap(brackets, mv(dev, x=1.5)) > 0.01)
         report.check("device drops in from above (before mounting)",
                      _overlap(brackets, mv(dev, z=DEV_H + 10)) < 1e-4)
-        # cable tail
+        # cable anchors
         plugs, ties = parts["plugs"].shape, parts["ties"].shape
         report.check("plugs clear of the cradle", _overlap(brackets, plugs) < 1e-3, f"{_overlap(brackets, plugs):.4f} mm³")
         report.check("plugs pull straight out", _overlap(brackets, mv(plugs, y=max(p[4] for p in PLUGS) + 5)) < 1e-3)
@@ -643,18 +792,21 @@ def checks(report, parts, variant):
         report.check("screws stay inside the desk", SCREW_L - TF < DESK_T,
                      f"{SCREW_L - TF:.1f} mm into the desk; it must be thicker than that (assumed {DESK_T:g})")
         cables_ = parts["cables"].shape
-        seated = [_overlap(brackets, c) < 1e-3 and _overlap(brackets, mv(c, z=0.05)) > 1e-4
-                  and all(_overlap(brackets, mv(c, x=s * 0.5)) > 1e-3 for s in (-1, 1)) for c in cables_.solids()]
+        # the anchors' frames: towards the face they hang from (tail: up; arm: +x), and across the groove
+        inward = (lambda c, d: mv(c, x=d)) if arm else (lambda c, d: mv(c, z=d))
+        across = (lambda c, d: mv(c, z=d)) if arm else (lambda c, d: mv(c, x=d))
+        seated = [_overlap(brackets, c) < 1e-3 and _overlap(brackets, inward(c, 0.05)) > 1e-4
+                  and all(_overlap(brackets, across(c, s * 0.5)) > 1e-3 for s in (-1, 1)) for c in cables_.solids()]
         report.check(f"cables {CABLE_D[0]:g}–{CABLE_D[1]:g} mm seat in the anchors' grooves", all(seated),
                      "each sits up in its groove, clear of the cradle, and can't slide 0.5 mm sideways")
         report.check("zip ties pass through the anchors", _overlap(brackets, ties) < 1e-3
-                     and all(_overlap(brackets, mv(t, z=-2.0)) > 0.1 for t in ties.solids()),
-                     "clear of the cradle, and trapped: pulling each tie 2 mm down collides")
-        (ex0, ex1), (d0, d1) = EXHAUST
-        body_top = cradle_frame()[1]
-        behind = Box(ex1 - ex0, 60, d1 - d0, align=(MIN, MIN, MAX)).moved(Location((ex0, DEV_D / 2, body_top - d0)))
+                     and all(_overlap(brackets, inward(t, -2.0)) > 0.1 for t in ties.solids()),
+                     "clear of the cradle, and trapped: pulling each tie 2 mm off its anchor collides")
+        behind = back_face(right_side_up=arm)[1]
         report.check("exhaust airflow clear (60 mm behind the slots)", _overlap(brackets, behind) < 1e-3,
                      "slot area assumed from the photo")
+        touching = brackets & Box(400, 400, 0.2, align=(C, C, MAX))      # the top 0.2 mm: what's against the desk
+        report.check("area against the desk", True, f"{abs(touching.volume) / 0.2 / 100:.0f} cm²")
     elif variant == "inverted":
         report.check("device: supported", _overlap(brackets, mv(dev, z=-0.5)) > 1, "lowering it 0.5 mm collides")
         desk_ = parts["desk"].shape
@@ -673,9 +825,14 @@ def checks(report, parts, variant):
                      f"lift {lift:.1f} mm; space above device {-db.max.Z:.1f} mm")
 
     # airflow: front (intake) and back (exhaust + ports) open inside the border; fin coverage
-    border = CRADLE_BORDER if variant == "cradle" else BORDER
+    border = CRADLE_BORDER if variant in ("cradle", "sidearm") else BORDER
+    face = dev
+    if variant in ("cradle", "sidearm"):           # the faces are the body's: leave out the rubber feet
+        ih, body_top = cradle_frame()[2], cradle_frame()[1]
+        z0 = -ih + FOAM_GAP + FEET_H if variant == "sidearm" else body_top - DEV_H
+        face = dev & Box(DEV_W + 2, DEV_D + 2, DEV_H, align=(C, C, MIN)).moved(Location((0, 0, z0)))
     for name, side in (("front", -1), ("back", +1)):
-        cov = face_coverage(dev, brackets, 1, side, border)
+        cov = face_coverage(face, brackets, 1, side, border)
         report.check(f"{name} face open inside the {border:g} mm border", cov < 0.005, f"{100 * cov:.1f} % covered")
     fin_axis = 2 if variant == "flat" else 0
     other = [i for i in range(3) if i not in (fin_axis, 1)][0]          # the fins' "height" axis
@@ -687,7 +844,7 @@ def checks(report, parts, variant):
     # comparison numbers
     allb = brackets.bounding_box()
     drop = -min(allb.min.Z, db.min.Z)
-    screws = len(cradle_screws()) if variant == "cradle" else 4
+    screws = len(cradle_screws("arm" if variant == "sidearm" else "tail")) if variant in ("cradle", "sidearm") else 4
     report.check("hangs below the desk", True, f"{drop:.0f} mm")
     report.check("desk footprint", True, f"{allb.size.X:.0f} × {allb.size.Y:.0f} mm")
     report.check("screws", True, f"{screws}, {DEV_MASS * 9.81 / screws:.1f} N each (the device's weight shared)")
