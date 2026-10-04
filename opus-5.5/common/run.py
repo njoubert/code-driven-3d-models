@@ -46,10 +46,13 @@ def main():
     written = export_all(model, out)
     if not args.fast:
         from .drawing import draw_sheets
-        from .render import render_sheet
+        from .render import render_detail, render_sheet
         sheet = out / "render_sheet.png"
         render_sheet(model, sheet)
         written += [sheet] + draw_sheets(model, out)
+        if model.detail:
+            render_detail(model, out / "render_detail.png")
+            written.append(out / "render_detail.png")
 
     from .bambu import slice_project
     sliced = slice_project(out / f"{model.name}_plate.3mf")
@@ -57,6 +60,7 @@ def main():
         print("[slice]   skipped (Bambu Studio not installed)")
     elif "error" in sliced:
         print(f"[slice]   FAILED: {sliced['error']}")
+        report.add("FAIL", "Bambu Studio slices the plate", sliced["error"])
     else:
         print(f"[slice]   Bambu Studio estimate: {sliced['minutes']} min, {sliced['grams']} g "
               f"({sliced['layer_height']} mm layers)")

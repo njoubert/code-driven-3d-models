@@ -39,9 +39,17 @@ IDENTITY4 = "1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"
 
 
 def write_project(path: Path, objects: list[tuple[str, object]], seed: str,
-                  settings: Path = DEFAULT_SETTINGS):
-    """objects: (name, shape) pairs, already placed on the bed (print pose, z=0 floor)."""
+                  settings: Path = DEFAULT_SETTINGS, overrides: dict | None = None):
+    """objects: (name, shape) pairs, already placed on the bed (print pose, z=0 floor).
+    overrides: Bambu setting keys to change for this model, e.g. {"enable_support": "1"}."""
     config = settings.read_text()
+    if overrides:
+        merged = json.loads(config)
+        unknown = set(overrides) - set(merged)
+        if unknown:
+            raise KeyError(f"not Bambu Studio settings: {sorted(unknown)}")
+        merged.update(overrides)
+        config = json.dumps(merged, indent=4) + "\n"
     version = json.loads(config).get("version", "02.08.02.61")
     ids = lambda k: (2 * k + 1, 2 * k + 2)          # (mesh object id, wrapper object id)
     uid = lambda tag: str(uuid.uuid5(uuid.NAMESPACE_URL, f"{seed}/{tag}"))

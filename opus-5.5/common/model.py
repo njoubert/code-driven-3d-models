@@ -22,6 +22,7 @@ class Part:
     print_pose: Location = field(default_factory=Location)  # use pose -> print pose (harness drops it onto z=0)
     explode: tuple[float, float, float] = (0, 0, 0)          # offset used by the 3D viewer's explode slider
     reference: bool = False            # True = not printed (e.g. the pill); rendered only, skipped by export/print checks
+    opacity: float = 1.0               # < 1 renders see-through (e.g. a reference desk you look through)
 
 
 @dataclass
@@ -72,6 +73,8 @@ class Model:
     sheets: list[Sheet] = field(default_factory=list)
     checks: Callable | None = None     # checks(report, parts_by_name) -> None
     section: Plane | None = None       # cutaway plane for the render sheet; keeps the side opposite the normal
+    slicer: dict = field(default_factory=dict)  # Bambu Studio setting overrides, e.g. {"enable_support": "1"}
+    detail: tuple | None = None        # close-up for small features: (label, centre xyz, half-size mm)
 
     def part(self, name: str) -> Part:
         return next(p for p in self.parts if p.name == name)

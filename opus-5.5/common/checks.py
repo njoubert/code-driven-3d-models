@@ -54,6 +54,15 @@ class Report:
         print(f"  -> {n['PASS']} pass, {n['WARN']} warn, {n['FAIL']} fail")
 
 
+def check_fused(report: Report, union, named_pieces, rel_tol: float = 0.01):
+    """A union must contain every piece in full. OpenCascade booleans occasionally drop a
+    piece without raising; this catches it. named_pieces: [(name, shape), ...]."""
+    missing = [name for name, piece in named_pieces
+               if abs((union & piece).volume) < piece.volume * (1 - rel_tol)]   # can come back inside-out
+    report.check("every fused piece is in the result", not missing,
+                 "missing: " + ", ".join(missing) if missing else f"all {len(named_pieces)} pieces present")
+
+
 def generic_checks(model: Model, report: Report):
     for part in model.printed:
         s = part.shape
@@ -82,13 +91,25 @@ def overhang_area(shape) -> tuple[float, float]:
     area = np.linalg.norm(n, axis=1) / 2
     nz = n[:, 2] / np.maximum(np.linalg.norm(n, axis=1), 1e-12)
     zmin = tri[:, :, 2].min(axis=1)
-    bad = (nz < -np.sin(np.radians(90 - OVERHANG_DEG))) & (zmin > 0.05)
+    # 1e-3: faces at exactly the limit (45° chamfers designed to print) don't count
+    bad = (nz < -np.sin(np.radians(90 - OVERHANG_DEG)) - 1e-3) & (zmin > 0.05)
     return float(area[bad].sum()), float(tri[bad][:, :, 2].max()) if bad.any() else 0.0
+
+
+def plate_check(model: Model, report: Report):
+    from .export import plate_layout   # here, not at the top: export imports this module
+    shapes = [print_shape(p).moved(loc) for p, loc in zip(model.printed, plate_layout(model))]
+    bb = shapes[0].bounding_box()
+    for s in shapes[1:]:
+        bb = bb.add(s.bounding_box())
+    report.check("print plate fits the bed", bb.size.X <= BED[0] and bb.size.Y <= BED[1],
+                 f"{bb.size.X:.0f} × {bb.size.Y:.0f} mm of {BED[0]:.0f} × {BED[1]:.0f}")
 
 
 def run_checks(model: Model) -> Report:
     report = Report()
     generic_checks(model, report)
+    plate_check(model, report)
     if model.checks:
         model.checks(report, {p.name: p for p in model.parts})
     return report

@@ -33,7 +33,8 @@ models/<name>/
 ```
 1. All checks must PASS. A WARN needs a sentence of explanation.
 2. Look at `out/<variant>/render_sheet.png` (6 views incl. cutaway and
-   print plate) and say what you checked in it.
+   print plate) and say what you checked in it. Models with small features
+   set `Model.detail` and also get `render_detail.png`: look at that too.
 3. For a change to the geometry or dimensions, also look at the
    `drawing_<part>.png` sheets.
 4. Report key numbers from the check output, not from the parameters.
@@ -42,6 +43,14 @@ Images catch gross errors (wrong face, missing feature, wrong
 orientation). Sizes are verified by the checks: when adding a feature with a
 fit requirement, add a check that **measures the geometry** (sections, rays,
 boolean interference, distances), not one that re-does parameter arithmetic.
+
+## Known OpenCascade pitfalls
+- Booleans can silently drop a piece. When fusing many curved pieces, use
+  `fuse_robust` (common/geom.py: verifies each step, retries with the seam
+  rotated) and run `check_fused` (common/checks.py) on the result.
+- Spheres have a seam (+X) and poles (±Z). Keep both away from where other
+  pieces touch: rotate them to hidden sides or onto a limb's axis.
+- `Cone` with equal radii fails; use `Cylinder`.
 
 ## New models
 Write `design.md` first and get it confirmed before writing `model.py`.

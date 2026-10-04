@@ -17,7 +17,7 @@ from .checks import BED
 from .geom import TESS_ANGLE, TESS_TOL, mesh_arrays, print_shape
 from .model import Model
 
-PLATE_GAP = 10.0  # mm between parts on the print plate
+PLATE_GAP = 16.0  # mm between parts on the plate: room for two 5 mm auto-brims plus margin
 # Outputs are committed, so keep them byte-stable (fixed STEP timestamp; see also bambu.py).
 STEP_TIMESTAMP = "2000-01-01T00:00:00"
 
@@ -34,7 +34,8 @@ def export_all(model: Model, out: Path) -> list[Path]:
     plate = out / f"{model.name}_plate.3mf"
     bed_centre = Location((BED[0] / 2, BED[1] / 2, 0))   # slicers put the plate origin at a corner
     bambu.write_project(plate, [(part.name, print_shape(part).moved(bed_centre * loc))
-                                for part, loc in zip(model.printed, plate_layout(model))], model.name)
+                                for part, loc in zip(model.printed, plate_layout(model))], model.name,
+                        overrides=model.slicer)
     written.append(plate)
 
     viewer = out / "viewer.html"
@@ -44,13 +45,27 @@ def export_all(model: Model, out: Path) -> list[Path]:
 
 
 def plate_layout(model: Model) -> list[Location]:
-    """Place print-pose parts side by side along X, centred on the origin."""
-    widths = [print_shape(p).bounding_box().size.X for p in model.printed]
-    total = sum(widths) + PLATE_GAP * (len(widths) - 1)
-    x, locs = -total / 2, []
-    for w in widths:
-        locs.append(Location((x + w / 2, 0, 0)))
-        x += w + PLATE_GAP
+    """Place print-pose parts in rows along X (wrapping when a row would exceed the bed),
+    rows stacked along Y, the whole layout centred on the origin."""
+    sizes = [print_shape(p).bounding_box().size for p in model.printed]
+    rows, row, width = [], [], 0.0
+    for i, s in enumerate(sizes):
+        if row and width + PLATE_GAP + s.X > BED[0] - 10:
+            rows.append(row)
+            row, width = [], 0.0
+        width += (PLATE_GAP if row else 0) + s.X
+        row.append(i)
+    rows.append(row)
+    depths = [max(sizes[i].Y for i in r) for r in rows]
+    locs: list[Location] = [Location()] * len(sizes)
+    y = (sum(depths) + PLATE_GAP * (len(rows) - 1)) / 2
+    for r, depth in zip(rows, depths):
+        total = sum(sizes[i].X for i in r) + PLATE_GAP * (len(r) - 1)
+        x = -total / 2
+        for i in r:
+            locs[i] = Location((x + sizes[i].X / 2, y - depth / 2, 0))
+            x += sizes[i].X + PLATE_GAP
+        y -= depth + PLATE_GAP
     return locs
 
 
@@ -70,6 +85,7 @@ def viewer_html(model: Model) -> str:
         "color": p.color,
         "explode": list(p.explode),
         "reference": p.reference,
+        "opacity": p.opacity,
         "stl": base64.b64encode(stl_bytes(p.shape)).decode(),
     } for p in model.parts]
     return VIEWER_TEMPLATE.replace("__TITLE__", model.title).replace("__PARTS__", json.dumps(parts))
@@ -112,7 +128,8 @@ const toggles = document.getElementById("toggles");
 for (const p of PARTS) {
   const bin = Uint8Array.from(atob(p.stl), c => c.charCodeAt(0));
   const geo = loader.parse(bin.buffer);
-  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.6, metalness: 0.05 }));
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.6, metalness: 0.05,
+    transparent: p.opacity < 1, opacity: p.opacity, depthWrite: p.opacity >= 1 }));
   const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color: 0x333333 }));
   const g = new THREE.Group(); g.add(mesh, edges); scene.add(g); objs.push({ p, g, mesh });
   box.expandByObject(g);

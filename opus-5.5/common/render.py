@@ -55,14 +55,14 @@ def render_sheet(model: Model, path: Path):
     pl = pv.Plotter(shape=(2, 3), window_size=(2100, 1300), border_color="#cccccc")
     bb = model.parts[0].shape.bounding_box()
     for p in model.parts[1:]:
-        bb.add(p.shape.bounding_box())
+        bb = bb.add(p.shape.bounding_box())
     center = (bb.center().X, bb.center().Y, bb.center().Z)
     size = f"{bb.size.X:.1f} × {bb.size.Y:.1f} × {bb.size.Z:.1f} mm"
 
     for i, (label, direction, up) in enumerate(VIEWS):
         pl.subplot(i // 3, i % 3)
         for p in model.parts:
-            add_shape(pl, p.shape, p.color)
+            add_shape(pl, p.shape, p.color, p.opacity)
         pl.add_text(label + ("   " + size if i == 0 else ""), font_size=10, color="black")
         pl.add_axes(line_width=3, labels_off=False)
         aim(pl, center, direction, up, 1.05)
@@ -81,6 +81,26 @@ def render_sheet(model: Model, path: Path):
     pl.close()
 
 
+DETAIL_VIEWS = [("FRONT", (0, -1, 0.05)), ("3/4 FRONT-LEFT", (-1, -1, 0.3)), ("PROFILE (from +X)", (1, 0, 0.05))]
+
+
+def render_detail(model: Model, path: Path):
+    """Close-up of model.detail from the front, 3/4 and side: small features (faces, text,
+    clips) are unreadable at whole-model zoom."""
+    label, c, half = model.detail
+    pl = pv.Plotter(shape=(1, 3), window_size=(1800, 650), border_color="#cccccc")
+    for i, (name, d) in enumerate(DETAIL_VIEWS):
+        pl.subplot(0, i)
+        for p in model.parts:
+            add_shape(pl, p.shape, p.color, p.opacity)
+        pl.add_text(f"DETAIL: {label} — {name}", font_size=10, color="black")
+        aim(pl, c, d, (0, 0, 1))
+        pl.reset_camera(bounds=(c[0] - half, c[0] + half, c[1] - half, c[1] + half, c[2] - half, c[2] + half))
+    pl.set_background("white")
+    pl.screenshot(str(path))
+    pl.close()
+
+
 def _cutaway(pl, model: Model, center):
     plane = model.section
     cut_bb = None
@@ -88,7 +108,7 @@ def _cutaway(pl, model: Model, center):
         half = split(p.shape, bisect_by=plane, keep=Keep.BOTTOM)
         if not half or half.volume <= 0:
             continue
-        add_shape(pl, half, p.color)
+        add_shape(pl, half, p.color, p.opacity)
         cut = [f for f in half.faces()
                if abs(plane.to_local_coords(f.center()).Z) < 1e-3
                and abs(abs(f.normal_at().dot(plane.z_dir)) - 1) < 1e-6]
@@ -121,7 +141,7 @@ def _plate(pl, model: Model):
     shapes = [print_shape(p).moved(loc) for p, loc in zip(model.printed, plate_layout(model))]
     bb = shapes[0].bounding_box()
     for s in shapes[1:]:
-        bb.add(s.bounding_box())
+        bb = bb.add(s.bounding_box())
     pad = 15
     bed = pv.Plane(center=(bb.center().X, bb.center().Y, -0.05), direction=(0, 0, 1),
                    i_size=bb.size.X + 2 * pad, j_size=bb.size.Y + 2 * pad)

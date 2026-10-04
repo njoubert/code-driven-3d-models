@@ -17,7 +17,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from build123d import GeomType
+from build123d import GeomType, PositionMode
 from matplotlib.patches import Circle, Polygon, Rectangle
 
 from .model import Dim, Model, Note, Sheet
@@ -62,10 +62,23 @@ def draw_sheets(model: Model, out: Path) -> list[Path]:
     written = []
     for i, sheet in enumerate(model.sheets):
         part = model.part(sheet.part)
+        if not sheet.dims:
+            sheet.dims = overall_dims(part.shape)
         stem = out / f"drawing_{sheet.part}"
         _draw(model, sheet, part.shape, stem, i + 1, len(model.sheets))
         written += [stem.with_suffix(".pdf"), stem.with_suffix(".png")]
     return written
+
+
+def overall_dims(shape) -> list[Dim]:
+    """Default dimensions: overall width and height on the front view, depth on the right."""
+    b = shape.bounding_box()
+    lo, hi = (b.min.X, b.min.Y, b.min.Z), (b.max.X, b.max.Y, b.max.Z)
+    return [
+        Dim("front", (lo[0], lo[1], lo[2]), (hi[0], lo[1], lo[2]), "h", -8),
+        Dim("front", (lo[0], lo[1], lo[2]), (lo[0], lo[1], hi[2]), "v", -8),
+        Dim("right", (hi[0], lo[1], lo[2]), (hi[0], hi[1], lo[2]), "h", -8),
+    ]
 
 
 # ---------------------------------------------------------------- layout
@@ -135,8 +148,12 @@ def _draw(model: Model, sheet: Sheet, shape, stem: Path, n: int, total: int):
         _dim(ax, placed[d.view], d)
     for name, view in placed.items():   # view label under the view, below its dimensions
         y = view.origin[1] - _used(sheet, name, "below") - 3
+        if y - TEXT_LABEL < MARGIN + 2:     # no room below (dims reach the border): label above instead
+            y, va = view.origin[1] + view.size[1] + _used(sheet, name, "above") + 2, "bottom"
+        else:
+            va = "top"
         ax.text(view.origin[0], y, name.upper(), fontsize=TEXT_LABEL * PT, color=INK,
-                ha="left", va="top", weight="bold")
+                ha="left", va=va, weight="bold")
     for note in sheet.notes:
         _note(ax, placed[note.view], note, sheet)
     _title_block(ax, W, model, sheet, s, paper, n, total)
@@ -151,14 +168,23 @@ def _polyline(edge) -> np.ndarray:
         ts = [0.0, 1.0]
     else:
         ts = np.linspace(0, 1, int(np.clip(edge.length / 0.25, 8, 400)))
-    return np.array([[p.X, p.Y] for p in (edge @ t for t in ts)])
+    # sample by curve parameter, not arc length: arc-length lookup fails on some freeform outlines
+    pts = (edge.position_at(t, position_mode=PositionMode.PARAMETER) for t in ts)
+    return np.array([[p.X, p.Y] for p in pts])
 
 
 def _edges(ax, edges, to_paper, lw, style):
+    failed = 0
     for e in edges:
-        pts = to_paper(_polyline(e))
+        try:
+            pts = to_paper(_polyline(e))
+        except Exception:
+            failed += 1
+            continue
         ax.plot(pts[:, 0], pts[:, 1], color=INK, lw=lw * PT, ls=style,
                 solid_capstyle="round", dash_capstyle="butt")
+    if failed:
+        print(f"  drawing: skipped {failed} edge(s) that could not be sampled")
 
 
 def _iso(ax, shape, box):
@@ -258,7 +284,8 @@ def _title_block(ax, W, model: Model, sheet: Sheet, s: float, paper: str, n: int
         ax.text(x0 + cx + 1.5, y0 + cy + 11.5, label, fontsize=1.8 * PT, color="#555", va="top")
         ax.text(x0 + cx + 1.5, y0 + cy + 2.5, value, fontsize=size * PT, color=INK, va="bottom")
 
-    ax.text(x0 + 3, y0 + TITLE_H - 4, model.title, fontsize=5 * PT, color=INK, va="top", weight="bold")
+    title_size = min(5.0, 5.0 * 30 / max(len(model.title), 1))   # shrink long titles to fit beside SCALE
+    ax.text(x0 + 3, y0 + TITLE_H - 4, model.title, fontsize=title_size * PT, color=INK, va="top", weight="bold")
     ax.text(x0 + 3, y0 + 16.5, f"part: {sheet.part}", fontsize=3.2 * PT, color=INK, va="bottom")
     scale = f"{int(s)}:1" if s >= 1 else f"1:{int(round(1 / s))}"
     ax.text(x0 + 99.5, y0 + TITLE_H - 2.5, "SCALE", fontsize=1.8 * PT, color="#555", va="top")
