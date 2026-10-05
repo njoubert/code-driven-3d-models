@@ -214,7 +214,7 @@ def build(variant: str = "cradle") -> Model:
     if variant not in VARIANTS:
         raise ValueError(f"variant must be one of {VARIANTS}")
     parts, sheets, section, title, detail = (cradle_concept if variant == "cradle" else coupon_concept)()
-    return Model(name="solo10g_desk_bracket", title=title, parts=parts, sheets=sheets, section=section,
+    return Model(name="desk_bracket_solo10g", title=title, parts=parts, sheets=sheets, section=section,
                  checks=lambda r, p: checks(r, p, variant), slicer=SLICER.get(variant, {}), detail=detail)
 
 
