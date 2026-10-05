@@ -11,7 +11,8 @@ anchors, no foam, no feet. **`--variant cradle`** (the default) is the part;
 |---|---|---|
 | width | 79.6 mm | measured (calipers), across the side fins |
 | height | 24.6 mm | measured, base plate to the top fins' tips |
-| depth | 102.1 mm | measured, front to back including the end plates' screw heads |
+| depth | 99.1 mm | measured, front plate to back plate (102.1 over the plates' screw heads) |
+| end plate screw heads | stand 1.5 mm proud of each plate | measured (102.1 − 99.1); they sit in the open between the lips and the top bars (owner, first test print), so the lips fit the plates themselves |
 | Ethernet (RJ45) jack, front | centred left/right; 4.9–16.9 mm down from the top | measured |
 | Ethernet jack width | 16 mm | **assumed** |
 | Thunderbolt 3 port, back | centred left/right; its bottom edge 7.6 mm above the base | measured |
@@ -69,6 +70,12 @@ open.
   it left/right.
 - **Floor rails** sit under the side walls, outside the device's width and
   below it, so they cover no fins. They tie the two floor bars together.
+  **6 × 6 mm** (`T`, as are the posts, side walls and floor bars; was 4): a
+  4 × 4 rail (~15 mm², with its corner rounded) broke off in test fitting.
+  Printed standing on end, a rail's layers stack along its length, so bending
+  it pulls the layers apart; it needs the extra section. The window corners
+  where the rails meet the posts are rounded to 6 mm (was 4). Checked: each rail
+  measures 35 mm² at mid-span (at least 30).
 - **Lips** at each end reach `LIP` (4 mm) up the end faces from the floor, full
   width, 4 mm thick (`STOP_T`; was 2.5). They stay under the Ethernet jack (4.9 mm up; 0.9 mm to spare), so the
   plug needs no notch (owner), and well under the Thunderbolt plug.
@@ -87,7 +94,9 @@ open.
 
 ## Fit
 - Across: 0.2 mm per side (`CLR`), as on the OWC cradle, which fit well.
-- Front to back: 0.2 mm per end (`CLR_Y`).
+- Front to back: 0.2 mm per end (`CLR_Y`): 99.5 mm between the lips for the
+  99.1 mm between the plates. (Until the first test print the lips were sized
+  over the screw heads, 102.1 mm.)
 - Inner corners are square, so a sharp-edged device sits flat on the floor bars.
 
 ## Fit coupon (`--variant coupon`)
@@ -105,7 +114,8 @@ device into it upside down and check:
   preset: switch to Generic PETG in Bambu Studio before slicing.
 - The cradle prints standing on its front end, like the OWC cradle, so each
   layer contains the load path. Tree supports (on in the project file) hold
-  up the back end frame's bars (top bar, floor bar, lip). About 2 h 12 min, 46 g.
+  up the back end frame's bars (top bar, floor bar, lip). About 2 h 13 min, 48 g.
+  124 × 107.5 mm on the desk, 35.6 mm below it.
 - Screws: 4 #6 × 5/8" flat-head screws, one through each pad. The pad and the
   flange are 7 mm thick together, so each screw reaches 8.9 mm into the desk.
   The device weighs 0.24 kg; any one screw alone could hold it many times over.
@@ -119,8 +129,9 @@ device into it upside down and check:
   base plate would meet the top bars lower down, so they'd catch less of it.
 - Fin depth and pitch, and how far in from each end the fins start (where
   the posts and floor bars touch).
-- Screw heads on the end plates: where they are, and how far they stick out
-  (the lips touch them).
+- Screw heads on the end plates: where exactly, and how wide? They clear the
+  lips and the top bars in the test print. With their positions, a check could
+  keep them clear if the lips or bars change.
 - Ethernet jack width, and which way its latch faces. Any status LEDs on the
   front?
 - Do you use the ThunderLok-S retainer on the Thunderbolt cable? It needs

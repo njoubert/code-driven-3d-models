@@ -16,9 +16,10 @@ from common.screws import CSK_ANGLE, CSK_D, SCREW_HEAD, SCREW_L, countersunk, sc
 
 C, MIN, MAX = Align.CENTER, Align.MIN, Align.MAX
 
-# ---- the device, measured with calipers (owner). Height: base plate to the top fins' tips; depth includes
-# the end plates' screw heads
-DEV_W, DEV_H, DEV_D = 79.6, 24.6, 102.1
+# ---- the device, measured with calipers (owner). Height: base plate to the top fins' tips; depth: front
+# plate to back plate. The plates' screw heads stand 1.5 mm proud (102.1 over them) but sit in the open
+# between the lips and the top bars (owner, from the first test print), so the lips fit the plates
+DEV_W, DEV_H, DEV_D = 79.6, 24.6, 99.1
 DEV_MASS = 0.24                # kg, published
 JACK_TOP, JACK_BOTTOM = 4.9, 16.9   # RJ45 jack on the front, centred: its edges, down from the device's top (measured)
 JACK_W = 16.0                  # **assumed**
@@ -38,7 +39,10 @@ CLR = 0.2                      # per side, across: as the OWC cradle, which fit
 CLR_Y = 0.2                    # per end, device to lips
 
 # ---- the cradle
-T = 4.0                        # posts, floor bars, floor rails
+T = 6.0                        # posts, floor bars, floor rails. Was 4: a 4 × 4 floor rail (~15 mm², its corner
+                               # rounded) broke off in test fitting. Printed standing on end, a rail's layers stack
+                               # along its length, so bending it pulls them apart
+RAIL_MIN_AREA = 30.0           # floor rail cross-section, at least twice the one that broke
 TF = 4.0                       # flanges and side strips: a flat frame, STANDOFF under the desk
 STANDOFF = 3.0                 # the side frame stands off the desk on four screw pads: the air pocket over the device
                                # vents through the slot this leaves along each side (owner: the pocket was sealed)
@@ -49,7 +53,7 @@ STOP_T = 4.0                   # lip and top bar thickness along Y. Was 2.5: own
 LIP = 4.0                      # lips: reach up the device's end faces, full width. Below the Ethernet jack (4.9 up),
                                # so no notch (owner). Lifted any higher, the device's top edge meets the top bars
 JACK_MARGIN = 0.5              # least room between the lip and the Ethernet plug
-WINDOW_R = 4.0                 # side windows' corners (gussets between posts, flanges and floor rails)
+WINDOW_R = 6.0                 # side windows' corners (gussets between posts, flanges and floor rails; was 4)
 R_FLANGE = 4.0                 # outer curve from flange to wall
 R_FLOOR = 2.5                  # outer bottom corners
 DESK_T = 18.0                  # reference desk
@@ -278,6 +282,14 @@ def checks(report, parts, variant):
         halves = [len((ring - Box(*size)).solids()) for size in ((1, 400, 400), (400, 1, 400))]
         report.check(f"one closed frame {label}", len(ring.solids()) == 1 and halves == [2, 2],
                      f"a 1 mm slice: {len(ring.solids())} piece(s); cut across x=0 and y=0: {halves[0]} and {halves[1]}")
+
+    # the floor rails, mid-span: each one piece, at least RAIL_MIN_AREA in section
+    mid = bracket & Box(400, 0.2, 100, align=(C, C, MAX)).moved(Location((0, 0, Z_FLOOR + 0.01)))
+    rails = mid.solids()
+    areas = [abs(r.volume) / 0.2 for r in rails]
+    sizes = [f"{r.bounding_box().size.X:.1f} × {r.bounding_box().size.Z:.1f} mm, {a:.0f} mm²" for r, a in zip(rails, areas)]
+    report.check("floor rails: section at mid-span", len(rails) == 2 and min(areas) >= RAIL_MIN_AREA,
+                 "; ".join(sizes) + f" (minimum {RAIL_MIN_AREA:g}; the 4 × 4 rail that broke was ~15)")
 
     # the air pocket between the base plate and the desk: open at the desk along both sides, to the room (the
     # top bars close the ends). On each side, cross-sections of the way out (from the device's edge to the cradle's): the tightest one's free area
