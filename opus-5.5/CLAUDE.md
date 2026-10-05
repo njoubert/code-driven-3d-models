@@ -66,6 +66,12 @@ boolean interference, distances), not one that re-does parameter arithmetic.
 - **Removing a member can remove stiffness elsewhere.** An open U needs
   something tying its open side together; check the part stays one piece
   where it should.
+- **Print so the main load lies within the layers, not across them.** A
+  print is weakest at the joins between layers, and PETG under constant
+  load fails by peeling them apart. The brackets hang their load down and
+  their screws pull up, so they print standing on an end: every layer is a
+  whole cross-section of the U, and the load runs along the strands. Choose
+  the print pose from the load path first, then deal with supports.
 - Hard rubber feet have no give. For grip, compliance or vibration
   isolation, design in a gap for closed-cell foam instead of interference.
 - Fits that worked (P2S, PETG, 0.20 mm layers): 0.2 mm per side for a
