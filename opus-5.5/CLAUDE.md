@@ -43,6 +43,8 @@ Images catch gross errors (wrong face, missing feature, wrong
 orientation). Sizes are verified by the checks: when adding a feature with a
 fit requirement, add a check that **measures the geometry** (sections, rays,
 boolean interference, distances), not one that re-does parameter arithmetic.
+- `common/fit.py` measures fits by interference: `play` (how far a part
+  slides before it hits), `lift_to_clear`, `face_coverage`.
 - Make sure a new check can fail: remove the feature it guards and rerun.
 - Base clearance checks on the real object's measured layout (where its
   vents, ports, solid areas are), not a uniform guessed allowance.
@@ -79,7 +81,8 @@ boolean interference, distances), not one that re-does parameter arithmetic.
   on rather than step it); visual symmetry; few but redundant screws.
 - PETG for anything warm or under constant load.
 - Screws: #6 × 5/8" flat-head construction screws (4.0 mm hole, 7.4 mm
-  82° countersink).
+  82° countersink): `common/screws.py` has the hole and a
+  reference screw.
 - Commit before starting a new variant, and keep the chosen design
   building while a variant is explored.
 

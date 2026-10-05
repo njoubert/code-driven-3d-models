@@ -7,12 +7,13 @@ The desk underside is z = 0; brackets and device hang below it.
 
 from __future__ import annotations
 
-import math
+from build123d import (Align, Axis, Box, Cylinder, Location, Plane, Polygon, Rectangle, Vector,
+                       extrude, fillet)
 
-from build123d import (Align, Axis, Box, Cone, Cylinder, Location, Plane, Polygon, Rectangle,
-                       Rot, Vector, chamfer, extrude, fillet)
-
+from common.fit import face_coverage, lift_to_clear, overlap, play, union
+from common.geom import prism, profile
 from common.model import Dim, Model, Note, Part, Sheet
+from common.screws import CSK_ANGLE, CSK_D, SCREW_HEAD, SCREW_L, countersunk, screw
 
 C, MIN, MAX = Align.CENTER, Align.MIN, Align.MAX
 
@@ -50,10 +51,7 @@ DETENT_R, DETENT_H = 1.5, 0.7  # ridge on the rail's slope / notch in the runner
 DETENT_Y = -(DEV_D / 2 + CLR_Y + STOP_T) + SW / 2   # in the front frame's runner
 HANDLE_W, HANDLE_L = 36.0, 12.0
 
-# ---- screws: #6 × 5/8" flat-head construction screws (owner): 3.5 mm shank, ~6.9 mm head, 82° countersink
-SCREW_SIZE, SCREW_L, SCREW_HEAD = 3.5, 15.9, 6.9
-SCREW_D = 4.0                  # clearance hole (printed holes come out a little small)
-CSK_D, CSK_ANGLE = 7.4, 82.0   # countersink: a little over the head, so it seats flush
+# ---- screws: #6 × 5/8" flat-head construction screws (owner), see common/screws.py
 DESK_T = 18.0
 
 PETG = "PETG"                  # recommended; the project files load the PLA preset, so switch filament
@@ -134,41 +132,6 @@ COUPON_DEVICE = 25.0           # how much of the device the views show
 
 
 # ---------------------------------------------------------------- helpers
-
-def prism(face, y0, y1):
-    """Extrude a profile drawn in (x, z) from y = y0 to y = y1. The direction is explicit:
-    a face's normal can flip after 2D booleans and fillets, and extrude() follows it."""
-    at_y0 = Plane(origin=(0, y0, 0), x_dir=(1, 0, 0), z_dir=(0, -1, 0))   # local (u, v) = (x, z)
-    return extrude(at_y0 * face, amount=y1 - y0, dir=(0, 1, 0))
-
-
-def profile(outer_pts, holes=(), corners=()):
-    """2D profile in (x, z): polygon minus rectangles (x0, z0, x1, z1), with rounded corners (x, z, r)."""
-    face = Polygon(*outer_pts, align=None).face()
-    for x0, z0, x1, z1 in holes:
-        face = (face - Rectangle(x1 - x0, z1 - z0, align=(MIN, MIN)).moved(Location((x0, z0)))).face()
-    for x, z, r in corners:
-        v = min(face.vertices(), key=lambda v: (v.X - x) ** 2 + (v.Y - z) ** 2)
-        face = face.fillet_2d(r, [v])
-    return face
-
-
-def countersunk(x, y, z_bottom, length):
-    """Screw hole up into the desk, countersunk from the underside at z_bottom."""
-    t = math.tan(math.radians(CSK_ANGLE / 2))
-    h = (CSK_D - SCREW_D) / 2 / t
-    return (Cylinder(SCREW_D / 2, length + 2, align=(C, C, MIN)).moved(Location((x, y, z_bottom - 1)))
-            + Cone(CSK_D / 2 + 0.1 * t, SCREW_D / 2, h + 0.1, align=(C, C, MIN)).moved(Location((x, y, z_bottom - 0.1))))
-
-
-def screw(x, y, z_bottom):
-    """Reference #6 flat-head screw, head flush with the flange's underside at z_bottom, going up."""
-    t = math.tan(math.radians(CSK_ANGLE / 2))
-    h = (SCREW_HEAD - SCREW_SIZE) / 2 / t
-    head = Cone(SCREW_HEAD / 2, SCREW_SIZE / 2, h, align=(C, C, MIN))
-    return (head + Cylinder(SCREW_SIZE / 2, SCREW_L - h, align=(C, C, MIN)).moved(Location((0, 0, h)))).moved(
-        Location((x, y, z_bottom)))
-
 
 def device_body(box, height_axis=Axis.Z):
     """The device from its bounding box: only the corners between the front/back and side panels
@@ -460,7 +423,7 @@ def foam(right_side_up=False):
     iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame(right_side_up)
     xc = min(DEV_W / 2 - FEET_INSET, iw / 2 - FOAM_W / 2 - 0.5)
     ya, yb = y0 + STOP_T + 0.5, y1 - STOP_T - 0.5
-    return _union([Box(FOAM_W, yb - ya, FOAM_GAP, align=(C, MIN, MIN)).moved(
+    return union([Box(FOAM_W, yb - ya, FOAM_GAP, align=(C, MIN, MIN)).moved(
         Location((sx * xc, ya, -ih))) for sx in (-1, 1)])
 
 
@@ -480,7 +443,7 @@ def back_face(right_side_up=False):
     xb, zb = at(ex1, d1)
     space = Box(abs(xb - xa), 60, abs(zb - za), align=(MIN, MIN, MIN)).moved(
         Location((min(xa, xb), DEV_D / 2, min(za, zb))))
-    return _union(plugs), space
+    return union(plugs), space
 
 
 def anchor_refs(style):
@@ -490,7 +453,7 @@ def anchor_refs(style):
         cable, tie = anchor_ref(d)
         cables.append(cable.moved(loc))
         ties.append(tie.moved(loc))
-    return _union(cables), _union(ties)
+    return union(cables), union(ties)
 
 
 def cradle_concept():
@@ -507,7 +470,7 @@ def cradle_concept():
         Part("plugs", plugs, color="#3a6fd8", reference=True),
         Part("cables", cable_bits, color="#26282c", reference=True),
         Part("ties", ties, color="#f2f2ee", reference=True),
-        Part("screws", _union([screw(x, y, -TF) for x, y in cradle_screws("tail")]), color="#b8bcc2", reference=True),
+        Part("screws", union([screw(x, y, -TF) for x, y in cradle_screws("tail")]), color="#b8bcc2", reference=True),
         Part("desk", desk(2 * xf + 40, 2 * y_end + 20).moved(Location((0, y_end / 2 - DEV_D / 4, 0))),
              color="#c8a978", reference=True, opacity=0.25),
     ]
@@ -541,7 +504,7 @@ def sidearm_concept():
         Part("plugs", plugs, color="#3a6fd8", reference=True),
         Part("cables", cable_bits, color="#26282c", reference=True),
         Part("ties", ties, color="#f2f2ee", reference=True),
-        Part("screws", _union([screw(x, y, -TF) for x, y in cradle_screws("arm")]), color="#b8bcc2", reference=True),
+        Part("screws", union([screw(x, y, -TF) for x, y in cradle_screws("arm")]), color="#b8bcc2", reference=True),
         Part("desk", desk(2 * xf + 40, 2 * y_end + 20).moved(Location((0, y_end / 2 - DEV_D / 4, 0))),
              color="#c8a978", reference=True, opacity=0.25),
     ]
@@ -675,95 +638,34 @@ def build(variant: str = "cradle") -> Model:
 
 # ---------------------------------------------------------------- checks
 
-def _overlap(a, b) -> float:
-    return abs((a & b).volume) if a is not None else 0.0
-
-
-def _play(fixed, moving, axis: int, sign: int, hi: float = 3.0, tol: float = 0.005) -> float:
-    """How far `moving` can slide along +/- `axis` before it touches `fixed` (bisection)."""
-    def hits(d):
-        v = [0.0, 0.0, 0.0]
-        v[axis] = sign * d
-        return _overlap(fixed, moving.moved(Location(tuple(v)))) > 1e-4
-    lo = 0.0
-    if not hits(hi):
-        return hi
-    while hi - lo > tol:
-        mid = (lo + hi) / 2
-        lo, hi = (lo, mid) if hits(mid) else (mid, hi)
-    return lo
-
-
-def _lift_to_clear(fixed, moving, push: float = 3.0, tol: float = 0.05, hi: float = 10.0) -> float:
-    """How far `moving` must be lifted before it can be pushed `push` mm along -y (forward; negative: back)
-    without a collision; `hi` if not even then."""
-    lo = 0.0
-    hits = lambda z: _overlap(fixed, moving.moved(Location((0, -push, z)))) > 1e-4
-    while hi - lo > tol:
-        mid = (lo + hi) / 2
-        lo, hi = (mid, hi) if hits(mid) else (lo, mid)
-    return hi
-
-
-def _union(shapes):
-    u = shapes[0]
-    for s in shapes[1:]:
-        u = u + s
-    return u
-
-
-def face_coverage(device, brackets, axis: int, side: int, inset: float = 0.0, reach: float = 8.0,
-                  insets: dict | None = None) -> float:
-    """Fraction of a device face shadowed by bracket material within `reach` mm of it,
-    ignoring an `inset` border (or per-axis `insets`, {axis index: mm}). Projected area
-    from a slab in front of the face."""
-    b = device.bounding_box()
-    lo, hi = [b.min.X, b.min.Y, b.min.Z], [b.max.X, b.max.Y, b.max.Z]
-    a, o = axis, [i for i in range(3) if i != axis]
-    size, centre = [0.0] * 3, [0.0] * 3
-    for i in o:
-        size[i] = hi[i] - lo[i] - 2 * (insets.get(i, inset) if insets else inset)
-        centre[i] = (hi[i] + lo[i]) / 2
-    size[a] = reach
-    centre[a] = (hi[a] + reach / 2 + 0.01) if side > 0 else (lo[a] - reach / 2 - 0.01)
-    slab = Box(*size).moved(Location(tuple(centre)))
-    hit = slab & brackets
-    if not hit or abs(hit.volume) < 1e-6:
-        return 0.0
-    n = [0.0, 0.0, 0.0]
-    n[a] = 1.0
-    proj = sum(f.area * abs(f.normal_at().dot(Vector(*n))) for f in hit.faces()) / 2
-    return min(proj / (size[o[0]] * size[o[1]]), 1.0)
-
-
 def checks(report, parts, variant):
     dev = parts["device"].shape
     printed = [p.shape for name, p in parts.items() if not p.reference]
-    brackets = _union(printed)
+    brackets = union(printed)
     db = dev.bounding_box()
     mv = lambda s, x=0.0, y=0.0, z=0.0: s.moved(Location((x, y, z)))
 
-    report.check("device: no interference", _overlap(brackets, dev) < 1e-4, f"{_overlap(brackets, dev):.4f} mm³")
+    report.check("device: no interference", overlap(brackets, dev) < 1e-4, f"{overlap(brackets, dev):.4f} mm³")
 
     if variant in ("cradle", "sidearm", "coupon"):
         # a device with sharp edges (0.2 mm), on the floor without foam, pushed against either wall
         iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame(variant == "sidearm")
         sharp = device_body(Box(DEV_W, DEV_D, 10, align=(C, C, MIN)).moved(Location((0, 0, -ih))))
-        flat = all(_overlap(brackets, mv(sharp, x=s * CLR)) < 1e-4 for s in (-1, 0, 1))
+        flat = all(overlap(brackets, mv(sharp, x=s * CLR)) < 1e-4 for s in (-1, 0, 1))
         report.check("device sits flat on the floor (sharp bottom edges, no foam)", flat,
                      "square inner corners: no contact anywhere but the floor, centred or against a wall")
 
     if variant == "coupon":
-        report.dim("space under the device for foam (measured)", _play(brackets, dev, 2, -1, hi=5), FOAM_GAP, tol=0.03)
-        report.check("device: supported (on the foam)", _overlap(brackets + parts["foam"].shape, mv(dev, z=-0.5)) > 1,
+        report.dim("space under the device for foam (measured)", play(brackets, dev, 2, -1, hi=5), FOAM_GAP, tol=0.03)
+        report.check("device: supported (on the foam)", overlap(brackets + parts["foam"].shape, mv(dev, z=-0.5)) > 1,
                      "lowering it 0.5 mm collides")
-        report.check("device drops in from above", _overlap(brackets, mv(dev, z=COUPON_DEVICE + 5)) < 1e-4)
+        report.check("device drops in from above", overlap(brackets, mv(dev, z=COUPON_DEVICE + 5)) < 1e-4)
         for label, axis, want in (("sideways", 0, CLR), ("front/back", 1, CRADLE_CLR_Y)):
-            plays = [_play(brackets, dev, axis, s) for s in (-1, 1)]
+            plays = [play(brackets, dev, axis, s) for s in (-1, 1)]
             report.dim(f"play {label}, each way (measured)", min(plays), want, tol=0.03)
         # the lips: they must still stop the device at its rounded edge. Measure how far up the device's
         # end face the lip reaches: lift the device until it clears the front lip when pushed forward.
-        lift = _lift_to_clear(brackets, dev)
+        lift = lift_to_clear(brackets, dev)
         report.dim("lips: lift to clear them (measured)", lift, CRADLE_LIP, tol=0.1)
         cradle, _ = make_cradle()
         same = abs((cradle & brackets).volume - brackets.volume) < 1e-3
@@ -774,40 +676,40 @@ def checks(report, parts, variant):
         tray = parts["cage"].shape
         rails = parts["rail_left"].shape + parts["rail_right"].shape
         unit = tray + dev
-        report.check("tray: rests on the rails", _overlap(rails, mv(tray, z=-0.5)) > 1, "lowering it 0.5 mm collides")
-        report.check("tray: back stop", _overlap(rails, mv(tray, y=1.0)) > 0.1, "pushing it 1 mm back collides")
-        report.check("tray: detent holds it in", _overlap(rails, mv(tray, y=-3.0)) > 0.01, "pulling it 3 mm forward collides")
+        report.check("tray: rests on the rails", overlap(rails, mv(tray, z=-0.5)) > 1, "lowering it 0.5 mm collides")
+        report.check("tray: back stop", overlap(rails, mv(tray, y=1.0)) > 0.1, "pushing it 1 mm back collides")
+        report.check("tray: detent holds it in", overlap(rails, mv(tray, y=-3.0)) > 0.01, "pulling it 3 mm forward collides")
         lift = DETENT_H * 2 ** 0.5 + 0.15           # ridge stands DETENT_H proud of a 45° slope
         report.check("tray: pulls out after lifting over the detent",
-                     _overlap(rails, mv(tray, y=-(DEV_D + 40), z=lift)) < 1e-4
+                     overlap(rails, mv(tray, y=-(DEV_D + 40), z=lift)) < 1e-4
                      and lift < RUN_GAP, f"lift {lift:.2f} mm of {RUN_GAP:g} mm available")
-        report.check("device lifts out of the tray", _overlap(tray, mv(dev, z=db.size.Z + 5)) < 1e-4)
-        report.check("device held in the tray", _overlap(tray, mv(dev, y=-1.5)) > 0.01 and _overlap(tray, mv(dev, x=1.5)) > 0.01,
+        report.check("device lifts out of the tray", overlap(tray, mv(dev, z=db.size.Z + 5)) < 1e-4)
+        report.check("device held in the tray", overlap(tray, mv(dev, y=-1.5)) > 0.01 and overlap(tray, mv(dev, x=1.5)) > 0.01,
                      "sliding it 1.5 mm forward or sideways collides")
     elif variant in ("cradle", "sidearm"):
         arm = variant == "sidearm"
         desk_ = parts["desk"].shape
-        up = _play(desk_, dev, 2, 1, hi=10)
+        up = play(desk_, dev, 2, 1, hi=10)
         report.dim("air between the device and the desk (measured)", up, SIDEARM_GAP if arm else DESK_GAP, tol=0.03)
         for way, push in (("front", 3.0), ("back", -3.0)):
-            clear = _lift_to_clear(brackets, dev, push)
+            clear = lift_to_clear(brackets, dev, push)
             report.check(f"device can't escape over the {way}", clear > up + 1,
                          f"it must lift {'more than ' if clear >= 9.9 else ''}{clear:.1f} mm; the desk stops it at {up:.1f} mm")
-        report.dim("space under the device for foam (measured)", _play(brackets, dev, 2, -1, hi=5), FOAM_GAP, tol=0.03)
-        report.check("device: supported (on the foam)", _overlap(brackets + parts["foam"].shape, mv(dev, z=-0.5)) > 1,
+        report.dim("space under the device for foam (measured)", play(brackets, dev, 2, -1, hi=5), FOAM_GAP, tol=0.03)
+        report.check("device: supported (on the foam)", overlap(brackets + parts["foam"].shape, mv(dev, z=-0.5)) > 1,
                      "lowering it 0.5 mm collides")
         report.check("device: lips hold it front and back",
-                     _overlap(brackets, mv(dev, y=-(CRADLE_CLR_Y + 1))) > 0.01 and _overlap(brackets, mv(dev, y=CRADLE_CLR_Y + 1)) > 0.01)
-        report.check("device: held sideways", _overlap(brackets, mv(dev, x=1.5)) > 0.01)
+                     overlap(brackets, mv(dev, y=-(CRADLE_CLR_Y + 1))) > 0.01 and overlap(brackets, mv(dev, y=CRADLE_CLR_Y + 1)) > 0.01)
+        report.check("device: held sideways", overlap(brackets, mv(dev, x=1.5)) > 0.01)
         report.check("device drops in from above (before mounting)",
-                     _overlap(brackets, mv(dev, z=DEV_H + 10)) < 1e-4)
+                     overlap(brackets, mv(dev, z=DEV_H + 10)) < 1e-4)
         # cable anchors
         plugs, ties = parts["plugs"].shape, parts["ties"].shape
-        report.check("plugs clear of the cradle", _overlap(brackets, plugs) < 1e-3, f"{_overlap(brackets, plugs):.4f} mm³")
-        report.check("plugs pull straight out", _overlap(brackets, mv(plugs, y=max(p[4] for p in PLUGS) + 5)) < 1e-3)
+        report.check("plugs clear of the cradle", overlap(brackets, plugs) < 1e-3, f"{overlap(brackets, plugs):.4f} mm³")
+        report.check("plugs pull straight out", overlap(brackets, mv(plugs, y=max(p[4] for p in PLUGS) + 5)) < 1e-3)
         screws_ = parts["screws"].shape.solids()
-        recess = [_play(brackets, sc, 2, 1, hi=3) for sc in screws_]   # how far up each head goes before it seats
-        flush = all(_overlap(brackets, sc) < 1e-3 for sc in screws_) and max(recess) < 0.6
+        recess = [play(brackets, sc, 2, 1, hi=3) for sc in screws_]   # how far up each head goes before it seats
+        flush = all(overlap(brackets, sc) < 1e-3 for sc in screws_) and max(recess) < 0.6
         report.check(f"#6 screws seat in all {len(screws_)} countersinks", flush,
                      f"heads sit {min(recess):.2f}–{max(recess):.2f} mm below flush (head {SCREW_HEAD:g} mm, "
                      f"countersink {CSK_D:g} mm, {CSK_ANGLE:g}°)")
@@ -817,15 +719,15 @@ def checks(report, parts, variant):
         # the anchors' frames: towards the face they hang from (tail: up; arm: +x), and across the groove
         inward = (lambda c, d: mv(c, x=d)) if arm else (lambda c, d: mv(c, z=d))
         across = (lambda c, d: mv(c, z=d)) if arm else (lambda c, d: mv(c, x=d))
-        seated = [_overlap(brackets, c) < 1e-3 and _overlap(brackets, inward(c, 0.05)) > 1e-4
-                  and all(_overlap(brackets, across(c, s * 0.5)) > 1e-3 for s in (-1, 1)) for c in cables_.solids()]
+        seated = [overlap(brackets, c) < 1e-3 and overlap(brackets, inward(c, 0.05)) > 1e-4
+                  and all(overlap(brackets, across(c, s * 0.5)) > 1e-3 for s in (-1, 1)) for c in cables_.solids()]
         report.check(f"cables {CABLE_D[0]:g}–{CABLE_D[1]:g} mm seat in the anchors' grooves", all(seated),
                      "each sits up in its groove, clear of the cradle, and can't slide 0.5 mm sideways")
-        report.check("zip ties pass through the anchors", _overlap(brackets, ties) < 1e-3
-                     and all(_overlap(brackets, inward(t, -2.0)) > 0.1 for t in ties.solids()),
+        report.check("zip ties pass through the anchors", overlap(brackets, ties) < 1e-3
+                     and all(overlap(brackets, inward(t, -2.0)) > 0.1 for t in ties.solids()),
                      "clear of the cradle, and trapped: pulling each tie 2 mm off its anchor collides")
         behind = back_face(right_side_up=arm)[1]
-        report.check("exhaust airflow clear (60 mm behind the slots)", _overlap(brackets, behind) < 1e-3,
+        report.check("exhaust airflow clear (60 mm behind the slots)", overlap(brackets, behind) < 1e-3,
                      "slot area assumed from the photo")
         top = brackets & Box(400, 400, 1.0, align=(C, C, MAX)).moved(Location((0, 0, -1.0)))   # a slice 1–2 mm down
         report.check("the U's two sides are tied together at the top", len(top.solids()) == 1,
@@ -833,19 +735,19 @@ def checks(report, parts, variant):
         touching = brackets & Box(400, 400, 0.2, align=(C, C, MAX))      # the top 0.2 mm: what's against the desk
         report.check("area against the desk", True, f"{abs(touching.volume) / 0.2 / 100:.0f} cm²")
     elif variant == "inverted":
-        report.check("device: supported", _overlap(brackets, mv(dev, z=-0.5)) > 1, "lowering it 0.5 mm collides")
+        report.check("device: supported", overlap(brackets, mv(dev, z=-0.5)) > 1, "lowering it 0.5 mm collides")
         desk_ = parts["desk"].shape
         feet_area = 2 * FEET_W * (DEV_D - 10)
-        squeeze = _overlap(desk_, dev) / feet_area
+        squeeze = overlap(desk_, dev) / feet_area
         report.dim("rubber feet pressed into the desk", squeeze, PRELOAD, tol=0.05)
         report.check("device: slides in and out (friction hold, no lips)",
-                     _overlap(brackets, mv(dev, y=-(DEV_D + 40))) < 1e-4)
+                     overlap(brackets, mv(dev, y=-(DEV_D + 40))) < 1e-4)
     else:
-        report.check("device: supported", _overlap(brackets, mv(dev, z=-0.5)) > 1, "lowering it 0.5 mm collides")
-        report.check("device: back stop", _overlap(brackets, mv(dev, y=CLR_Y + 1.0)) > 0.01)
-        report.check("device: front lip holds it", _overlap(brackets, mv(dev, y=-(CLR_Y + 1.0))) > 0.01)
+        report.check("device: supported", overlap(brackets, mv(dev, z=-0.5)) > 1, "lowering it 0.5 mm collides")
+        report.check("device: back stop", overlap(brackets, mv(dev, y=CLR_Y + 1.0)) > 0.01)
+        report.check("device: front lip holds it", overlap(brackets, mv(dev, y=-(CLR_Y + 1.0))) > 0.01)
         lift = FRONT_LIP + 0.3
-        free = _overlap(brackets, mv(dev, y=-(DEV_D + 40), z=lift)) < 1e-4
+        free = overlap(brackets, mv(dev, y=-(DEV_D + 40), z=lift)) < 1e-4
         report.check("device: slides out after lifting over the lip", free and db.max.Z + lift <= 0,
                      f"lift {lift:.1f} mm; space above device {-db.max.Z:.1f} mm")
 

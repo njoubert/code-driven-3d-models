@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
-from build123d import Location, Plane, Shape, Vector
+from build123d import Align, Location, Plane, Polygon, Rectangle, Shape, Vector, extrude
 
 from .model import Part
 
@@ -66,3 +66,21 @@ def fuse_robust(named_makers, angles=SEAM_ANGLES):
 
 def as_xyz(v: Vector) -> tuple[float, float, float]:
     return (v.X, v.Y, v.Z)
+
+
+def prism(face, y0, y1):
+    """Extrude a profile drawn in (x, z) from y = y0 to y = y1. The direction is explicit:
+    a face's normal can flip after 2D booleans and fillets, and extrude() follows it."""
+    at_y0 = Plane(origin=(0, y0, 0), x_dir=(1, 0, 0), z_dir=(0, -1, 0))   # local (u, v) = (x, z)
+    return extrude(at_y0 * face, amount=y1 - y0, dir=(0, 1, 0))
+
+
+def profile(outer_pts, holes=(), corners=()):
+    """2D profile in (x, z): polygon minus rectangles (x0, z0, x1, z1), with rounded corners (x, z, r)."""
+    face = Polygon(*outer_pts, align=None).face()
+    for x0, z0, x1, z1 in holes:
+        face = (face - Rectangle(x1 - x0, z1 - z0, align=(Align.MIN, Align.MIN)).moved(Location((x0, z0)))).face()
+    for x, z, r in corners:
+        v = min(face.vertices(), key=lambda v: (v.X - x) ** 2 + (v.Y - z) ** 2)
+        face = face.fillet_2d(r, [v])
+    return face
