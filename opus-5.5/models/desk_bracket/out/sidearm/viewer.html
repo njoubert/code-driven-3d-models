@@ -14,6 +14,7 @@
 <div id="ui"><h1>Desk bracket — cradle, right side up, cable tab</h1><div id="toggles"></div>
   <label>explode <input id="explode" type="range" min="0" max="1" step="0.01" value="0"></label>
   <label><input id="wire" type="checkbox"> edges only</label>
+  <label><input id="grid" type="checkbox" checked> grid (hide it to look from below)</label>
   <small>drag: orbit · right-drag: pan · scroll: zoom · grid = 10 mm</small></div>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
 "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
@@ -49,6 +50,7 @@ const grid = new THREE.GridHelper(Math.ceil(r / 10) * 20, Math.ceil(r / 10) * 2,
 grid.rotation.x = Math.PI / 2; grid.position.set(c.x, c.y, box.min.z - 0.01); scene.add(grid);
 scene.add(new THREE.AxesHelper(r * 0.25));
 camera.position.set(c.x - r * 0.8, c.y - r * 1.4, c.z + r * 0.9); controls.target.copy(c); controls.update();
+document.getElementById("grid").onchange = e => { grid.visible = e.target.checked; };
 document.getElementById("explode").oninput = e => { for (const o of objs) o.g.position.set(...o.p.explode.map(v => v * e.target.value)); };
 document.getElementById("wire").onchange = e => { for (const o of objs) o.mesh.visible = !e.target.checked; };
 function resize() { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
