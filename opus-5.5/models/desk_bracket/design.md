@@ -87,15 +87,26 @@ The desk underside is z = 0; everything hangs below it.
   Right side up, the ports are low on the back, on its +x half (the exhaust
   on the -x half). Instead of the tail, a **tab** off the +x side wall's back
   post, level with the ports (owner: rather than a full-height arm, then a
-  braced wing): a 5 mm plate reaching 45 mm back, just tall enough for the
+  braced wing): a 5 mm plate reaching 63 mm back (v1: 45, too short), just tall enough for the
   anchors and their ties (13–67 mm above the device's bottom), back corners
   rounded. Its inner face carries the three anchors (same anchor, turned to
   hang sideways; grooves along y) at 21, 40 and 59 mm above the device's
   bottom, spread over the ports (centres 22.7, 38.0, 54.5 mm, measured). Lips
   reach 6 mm up the body (9.24 mm off the floor, over the feet and foam). Only
-  the flanges touch the desk: 56 cm² vs the cradle's 104; screws three per
-  flange. The tab grows straight up from the post when printed standing on
-  end (no supports for it); 224 min, 91 g. (Tried first: a full-height arm
+  the flanges touch the desk: 57 cm² vs the cradle's 104; screws three per
+  flange. A **front cross-bar** across the top, wall to wall, ties the two
+  sides together at the flanges: without the tail nothing else does (sidearm
+  v1 printed without it, and the flanges' spacing wasn't held). It prints on
+  the bed. It is as tall as the bottom lip plus the floor, 14.24 mm, so from
+  the front the two bands match (owner). To keep it off the grille (solid
+  for 9.38 mm from the top plate, 23 mm from the feet side: measured) the
+  cradle is 2.76 mm taller: **5.76 mm of air above the device**
+  (`SIDEARM_GAP`), so the bar reaches 8.48 mm down its front, 0.9 mm short of
+  the holes. With more room to lift, the **back lip** reaches 7.5 mm up the
+  device (`BACK_LIP`): it can lift 5.76 at most, and the back has no
+  cross-bar (the lowest port is 19 mm up). Hangs 136 mm below the desk.
+  The tab grows straight up from the post when printed standing on
+  end (no supports for it); 243 min, 98 g. (Tried first: a full-height arm
   with a flange, 66 cm², 246 min, 106 g; a braced wing, 225 min, 97 g.)
 - **upright** (recommended) — two U-straps screwed to the desk; the device stands in them on
   its rubber feet, as on a desk. Straps are 14 mm wide so their arms sit on the

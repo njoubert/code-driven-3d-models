@@ -77,6 +77,8 @@ CRADLE_LIP = 6.0               # how far the lips reach up the device's end face
                                # up to CRADLE_BORDER, so the faces stay open
 CRADLE_BORDER = 6.0            # solid border at the device's own top edge, front and back: ~9–10 mm in the
                                # owner's photos, so 6 mm is a safe allowance for the coverage check
+FRONT_SOLID_TOP, FRONT_SOLID_FEET = 9.38, 23.0   # the front panel is solid (no grille holes) this far from the
+                               # top plate and from the feet-side plate (measured, owner); the grille is between
 POST = 12.0                    # solid end posts of the side walls (over the device's ~8 mm edge columns)
 RAIL = 6.0                     # side-wall rails along the top and bottom between the posts
 
@@ -112,7 +114,14 @@ SADDLE_D = 1.6                 # thickest cable; it's SADDLE_D deep, so its side
 
 # ---- sidearm: the cradle with the device right side up and, instead of the tail, a tab off one side
 # wall's back post, level with the ports, carrying the cable anchors: only the flanges touch the desk
-ARM_L = 45.0                   # how far the tab reaches behind the cradle (room behind the plugs for the loops)
+# The front cross-bar matches the bottom lip plus floor (owner: symmetric from the front) without
+# reaching the grille: the cradle is made taller instead, with more air above the device.
+BAR_CLEAR = 0.9                # the cross-bar stops this far above the grille (room for the foam squeezing more)
+SIDEARM_GAP = (T + FOAM_GAP + FEET_H + CRADLE_LIP) - (FRONT_SOLID_TOP - BAR_CLEAR)   # air above the device
+BACK_LIP = SIDEARM_GAP + 1.75  # the back lip's reach up the device: it can now lift SIDEARM_GAP, and at the back
+                               # no cross-bar stops it (the lowest port is 19 mm up)
+ARM_L = 63.0                   # how far the tab reaches behind the cradle (room behind the plugs for the loops;
+                               # sidearm v1 printed at 45, owner: ~40 % longer)
 ARM_POST = 14.0                # the anchors are centred this far in from the tab's end
 ARM_ANCHOR_UP = (21.0, 40.0, 59.0)   # anchor heights above the device's bottom: spread over PORTS_SPAN
 TAB_MARGIN = 4.0               # the tab reaches this far above the top anchor's tie and below the bottom one's
@@ -251,10 +260,12 @@ def inverted_concept():
     return parts, sheets, Plane.XZ.offset(-(y0 + SW / 2)), "Desk bracket — inverted, feet against the desk"
 
 
-def cradle_frame():
-    """The cradle's key coordinates: inner width, floor top depth below the desk, wall x's, ends."""
+def cradle_frame(right_side_up=False):
+    """The cradle's key coordinates: inner width, floor top depth below the desk, wall x's, ends. Right side
+    up (sidearm) there is SIDEARM_GAP of air above the device instead of DESK_GAP."""
     iw = DEV_W + 2 * CLR
-    body_top = -(FEET_H + DESK_GAP)                # the device's (upside-down) top: feet DESK_GAP below the desk
+    gap = SIDEARM_GAP if right_side_up else DESK_GAP
+    body_top = -(FEET_H + gap)                     # the device's (upside-down) top: feet `gap` below the desk
     ih = DEV_H - body_top + FOAM_GAP               # floor top: FOAM_GAP below the device
     xi, xo, xf = iw / 2, iw / 2 + T, iw / 2 + T + FLANGE
     y0, y1 = -(DEV_D / 2 + CRADLE_CLR_Y + STOP_T), DEV_D / 2 + CRADLE_CLR_Y + STOP_T
@@ -275,7 +286,7 @@ def tail_frame():
 def arm_frame():
     """The side arm: its end (y_end), the y of its anchors (centred on its end post), and the device's
     bottom (right side up: on its feet, on the foam), which the port and anchor heights are measured from."""
-    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame()
+    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame(True)
     y_end = y1 + ARM_L
     return y_end, y_end - ARM_POST / 2, -ih + FOAM_GAP + FEET_H
 
@@ -295,10 +306,11 @@ def cradle_screws(style="tail"):
     return [(sx * xs, y) for sx in (-1, 1) for y in three_per_side(y0 + 14, back)]
 
 
-def cradle_base(lip, beam):
+def cradle_base(lip, beam, right_side_up=False, back_lip=None):
     """The cradle without its cable management: the full-length U with both flanges, an open frame for
-    each side wall, a floor window leaving a `beam`-wide strip each side, and full-width lips."""
-    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame()
+    each side wall, a floor window leaving a `beam`-wide strip each side, and full-width lips (the back
+    one `back_lip` tall if given)."""
+    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame(right_side_up)
     cradle = strap(iw, ih, y0, y1, screws=False)   # holes are added by the caller
     # side walls: one open rectangle each, between the end posts and the thin top/bottom rails.
     # Printed standing on its front end, the back post spans the opening: supports hold it up.
@@ -309,7 +321,7 @@ def cradle_base(lip, beam):
     cradle -= Box(2 * wx, yb - ya, T + 2, align=(C, MIN, MAX)).moved(Location((0, ya, -ih + 1)))
     # lips front and back, on the floor, full width, wall to wall (1 mm into each wall: one solid)
     cradle += Box(iw + 2, STOP_T, lip, align=(C, MIN, MIN)).moved(Location((0, y0, -ih)))
-    cradle += Box(iw + 2, STOP_T, lip, align=(C, MAX, MIN)).moved(Location((0, y1, -ih)))
+    cradle += Box(iw + 2, STOP_T, back_lip or lip, align=(C, MAX, MIN)).moved(Location((0, y1, -ih)))
     return cradle
 
 
@@ -354,7 +366,7 @@ def anchor_places(style):
 def make_device(right_side_up=False):
     """The device in the cradle: upside down (feet up, DESK_GAP below the desk), or right side up on its
     feet, on the foam. Either way the stack is the same height, so the cradle is too."""
-    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame()
+    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame(right_side_up)
     if right_side_up:
         bottom = -ih + FOAM_GAP + FEET_H
         device = device_body(Box(DEV_W, DEV_D, DEV_H, align=(C, C, MIN)).moved(Location((0, 0, bottom))))
@@ -416,9 +428,16 @@ def make_sidearm():
     the cable anchors. Only the flanges touch the desk. The ports are on the device's +x half (right side
     up); its exhaust on the -x half.
     -> (cradle, device)"""
-    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame()
+    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame(True)
     y_end, tie_y, bottom = arm_frame()
-    cradle = cradle_base(CRADLE_LIP + FOAM_GAP + FEET_H, BEAM)
+    cradle = cradle_base(CRADLE_LIP + FOAM_GAP + FEET_H, BEAM, True, BACK_LIP + FOAM_GAP + FEET_H)
+    # front cross-bar across the top, wall to wall: with no tail, nothing else ties the U's two sides
+    # together up at the flanges (sidearm v1 printed without it: the flanges' spacing wasn't held). As
+    # tall as the bottom lip plus the floor under it, so from the front the two match (owner); the
+    # cradle's extra height (SIDEARM_GAP) keeps it BAR_CLEAR above the grille.
+    # It prints on the bed, the cradle standing on its front end.
+    bar = T + FOAM_GAP + FEET_H + CRADLE_LIP
+    cradle += Box(iw + 2, STOP_T, bar, align=(C, MIN, MAX)).moved(Location((0, y0, 0)))
     # the tab: the side wall carried on behind the back post, just over the anchors' height, its back
     # corners rounded. Standing on its front end to print, it grows straight up from the post: no supports.
     reach = ANCHOR_W / 2 + TIE_T + TAB_MARGIN
@@ -438,7 +457,7 @@ def make_sidearm():
 def foam(right_side_up=False):
     """Reference foam strips on the floor strips (beside the floor window), squeezed to FOAM_GAP, centred
     under the rubber feet (right side up, the feet stand on them), but kept on the strips."""
-    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame()
+    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame(right_side_up)
     xc = min(DEV_W / 2 - FEET_INSET, iw / 2 - FOAM_W / 2 - 0.5)
     ya, yb = y0 + STOP_T + 0.5, y1 - STOP_T - 0.5
     return _union([Box(FOAM_W, yb - ya, FOAM_GAP, align=(C, MIN, MIN)).moved(
@@ -449,7 +468,7 @@ def back_face(right_side_up=False):
     """The device's back, as placed: its plugs (as assumed in PLUGS) and the space behind its exhaust
     slots (EXHAUST), 60 mm deep. PLUGS and EXHAUST are given upside down (x as mounted, depth below
     its top); right side up, x flips and depth is height above its bottom. -> (plugs, exhaust space)"""
-    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame()
+    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame(right_side_up)
     bottom = -ih + FOAM_GAP + FEET_H
     at = (lambda x, d: (-x, bottom + d)) if right_side_up else (lambda x, d: (x, body_top - d))
     plugs = []
@@ -508,7 +527,7 @@ def cradle_concept():
 
 
 def sidearm_concept():
-    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame()
+    iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame(True)
     y_end, tie_y, bottom = arm_frame()
     cradle, device = make_sidearm()
     plugs, _ = back_face(right_side_up=True)
@@ -675,9 +694,10 @@ def _play(fixed, moving, axis: int, sign: int, hi: float = 3.0, tol: float = 0.0
     return lo
 
 
-def _lift_to_clear(fixed, moving, push: float = 3.0, tol: float = 0.05) -> float:
-    """How far `moving` must be lifted before it can be pushed `push` mm forward without a collision."""
-    lo, hi = 0.0, 10.0
+def _lift_to_clear(fixed, moving, push: float = 3.0, tol: float = 0.05, hi: float = 10.0) -> float:
+    """How far `moving` must be lifted before it can be pushed `push` mm along -y (forward; negative: back)
+    without a collision; `hi` if not even then."""
+    lo = 0.0
     hits = lambda z: _overlap(fixed, moving.moved(Location((0, -push, z)))) > 1e-4
     while hi - lo > tol:
         mid = (lo + hi) / 2
@@ -727,7 +747,7 @@ def checks(report, parts, variant):
 
     if variant in ("cradle", "sidearm", "coupon"):
         # a device with sharp edges (0.2 mm), on the floor without foam, pushed against either wall
-        iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame()
+        iw, body_top, ih, xi, xo, xf, y0, y1 = cradle_frame(variant == "sidearm")
         sharp = device_body(Box(DEV_W, DEV_D, 10, align=(C, C, MIN)).moved(Location((0, 0, -ih))))
         flat = all(_overlap(brackets, mv(sharp, x=s * CLR)) < 1e-4 for s in (-1, 0, 1))
         report.check("device sits flat on the floor (sharp bottom edges, no foam)", flat,
@@ -767,10 +787,12 @@ def checks(report, parts, variant):
     elif variant in ("cradle", "sidearm"):
         arm = variant == "sidearm"
         desk_ = parts["desk"].shape
-        up, clear = _play(desk_, dev, 2, 1, hi=10), _lift_to_clear(brackets, dev)
-        report.dim("air between the device and the desk (measured)", up, DESK_GAP, tol=0.03)
-        report.check("device can't jump the lips", clear > up + 1,
-                     f"it must lift {clear:.1f} mm to clear a lip; the desk stops it at {up:.1f} mm")
+        up = _play(desk_, dev, 2, 1, hi=10)
+        report.dim("air between the device and the desk (measured)", up, SIDEARM_GAP if arm else DESK_GAP, tol=0.03)
+        for way, push in (("front", 3.0), ("back", -3.0)):
+            clear = _lift_to_clear(brackets, dev, push)
+            report.check(f"device can't escape over the {way}", clear > up + 1,
+                         f"it must lift {'more than ' if clear >= 9.9 else ''}{clear:.1f} mm; the desk stops it at {up:.1f} mm")
         report.dim("space under the device for foam (measured)", _play(brackets, dev, 2, -1, hi=5), FOAM_GAP, tol=0.03)
         report.check("device: supported (on the foam)", _overlap(brackets + parts["foam"].shape, mv(dev, z=-0.5)) > 1,
                      "lowering it 0.5 mm collides")
@@ -805,6 +827,9 @@ def checks(report, parts, variant):
         behind = back_face(right_side_up=arm)[1]
         report.check("exhaust airflow clear (60 mm behind the slots)", _overlap(brackets, behind) < 1e-3,
                      "slot area assumed from the photo")
+        top = brackets & Box(400, 400, 1.0, align=(C, C, MAX)).moved(Location((0, 0, -1.0)))   # a slice 1–2 mm down
+        report.check("the U's two sides are tied together at the top", len(top.solids()) == 1,
+                     f"a slice just under the desk is {len(top.solids())} piece(s)")
         touching = brackets & Box(400, 400, 0.2, align=(C, C, MAX))      # the top 0.2 mm: what's against the desk
         report.check("area against the desk", True, f"{abs(touching.volume) / 0.2 / 100:.0f} cm²")
     elif variant == "inverted":
@@ -828,10 +853,37 @@ def checks(report, parts, variant):
     border = CRADLE_BORDER if variant in ("cradle", "sidearm") else BORDER
     face = dev
     if variant in ("cradle", "sidearm"):           # the faces are the body's: leave out the rubber feet
-        ih, body_top = cradle_frame()[2], cradle_frame()[1]
+        ih, body_top = cradle_frame(variant == "sidearm")[2], cradle_frame(variant == "sidearm")[1]
         z0 = -ih + FOAM_GAP + FEET_H if variant == "sidearm" else body_top - DEV_H
         face = dev & Box(DEV_W + 2, DEV_D + 2, DEV_H, align=(C, C, MIN)).moved(Location((0, 0, z0)))
     for name, side in (("front", -1), ("back", +1)):
+        if name == "front" and variant in ("cradle", "sidearm"):
+            # the front's grille, as measured: between FRONT_SOLID_FEET from the feet-side plate and
+            # FRONT_SOLID_TOP from the top plate (sides: CRADLE_BORDER, assumed)
+            ih, body_top = cradle_frame(variant == "sidearm")[2], cradle_frame(variant == "sidearm")[1]
+            if variant == "sidearm":       # right side up: feet-side plate at the bottom
+                feet_side = -ih + FOAM_GAP + FEET_H
+                z0, z1 = feet_side + FRONT_SOLID_FEET, feet_side + DEV_H - FRONT_SOLID_TOP
+            else:                          # upside down: feet-side plate at the top
+                z0, z1 = body_top - DEV_H + FRONT_SOLID_TOP, body_top - FRONT_SOLID_FEET
+            grille = Box(DEV_W - 2 * CRADLE_BORDER, DEV_D, z1 - z0, align=(C, C, MIN)).moved(Location((0, 0, z0)))
+            cov = face_coverage(grille, brackets, 1, side)
+            report.check("front grille open (measured solid border)", cov < 0.005, f"{100 * cov:.1f} % covered")
+            continue
+        if name == "back" and variant in ("cradle", "sidearm"):
+            # the back, from where the ports start (PORTS_SPAN[0] from the feet-side plate, measured) to
+            # CRADLE_BORDER from the top plate: ports, exhaust slots. Below the ports it's solid.
+            ih, body_top = cradle_frame(variant == "sidearm")[2], cradle_frame(variant == "sidearm")[1]
+            if variant == "sidearm":
+                feet_side = -ih + FOAM_GAP + FEET_H
+                z0, z1 = feet_side + PORTS_SPAN[0], feet_side + DEV_H - CRADLE_BORDER
+            else:
+                z0, z1 = body_top - DEV_H + CRADLE_BORDER, body_top - PORTS_SPAN[0]
+            open_ = Box(DEV_W - 2 * CRADLE_BORDER, DEV_D, z1 - z0, align=(C, C, MIN)).moved(Location((0, 0, z0)))
+            cov = face_coverage(open_, brackets, 1, side)
+            report.check(f"back open from the ports up ({PORTS_SPAN[0]:g} mm, measured)", cov < 0.005,
+                         f"{100 * cov:.1f} % covered")
+            continue
         cov = face_coverage(face, brackets, 1, side, border)
         report.check(f"{name} face open inside the {border:g} mm border", cov < 0.005, f"{100 * cov:.1f} % covered")
     fin_axis = 2 if variant == "flat" else 0
